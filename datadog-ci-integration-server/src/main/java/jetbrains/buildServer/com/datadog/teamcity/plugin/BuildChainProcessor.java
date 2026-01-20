@@ -18,6 +18,7 @@ import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebho
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebhook.JobStatus;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.PipelineWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.PipelineWebhook.PipelineStatus;
+import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.StepWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.Webhook;
 import jetbrains.buildServer.messages.Status;
 import jetbrains.buildServer.serverSide.BuildPromotion;
@@ -93,14 +94,17 @@ public class BuildChainProcessor {
 
     /**
      * Creates all the webhooks for a build chain. There will be 1 pipeline webhook for the final
-     * composite build and <em>N</em> webhooks for the eligible job builds in the chain.
+     * composite build, <em>N</em> job webhooks for the eligible job builds in the chain, and
+     * <em>M</em> step webhooks for the build steps within each job.
      */
     private List<Webhook> createWebhooks(SBuild pipelineBuild) {
         PipelineWebhook pipelineWebhook = createPipelineWebhook(pipelineBuild);
         List<Webhook> webhooks = new ArrayList<>(singletonList(pipelineWebhook));
-        webhooks.addAll(createJobWebhooks(pipelineBuild));
+        
+        // Add all job webhooks and their corresponding step webhooks
+        webhooks.addAll(createJobAndStepWebhooks(pipelineBuild));
 
-        // Adding git information to all webhooks
+        // Adding git information to all webhooks (optional for all levels per Datadog spec)
         Optional<GitInfo> gitInfoOptional = gitInformationExtractor.extractGitInfo(pipelineBuild);
         gitInfoOptional.ifPresent(gitInfo -> webhooks.forEach(webhook -> webhook.setGitInfo(gitInfo)));
 
@@ -138,17 +142,108 @@ public class BuildChainProcessor {
         throw new IllegalArgumentException("Pipeline status not recognized: " + buildStatus);
     }
 
-    private List<JobWebhook> createJobWebhooks(SBuild pipelineBuild) {
+    private List<Webhook> createJobAndStepWebhooks(SBuild pipelineBuild) {
         String pipelineName = buildName(pipelineBuild);
         String pipelineID = buildID(pipelineBuild);
         Date pipelineStartWithOffset = pipelineStartWithOffset(pipelineBuild);
 
-        return pipelineBuild.getBuildPromotion().getAllDependencies().stream()
+        List<Webhook> webhooks = new ArrayList<>();
+        
+        List<SBuild> allDependencies = pipelineBuild.getBuildPromotion().getAllDependencies().stream()
             .map(BuildPromotion::getAssociatedBuild)
             .filter(Objects::nonNull)
-            .filter(build -> !shouldBeIgnored(build, pipelineStartWithOffset))
-            .map(job -> createJobWebhook(job, pipelineName, pipelineID))
             .collect(toList());
+        
+        LOG.debug(format("Pipeline '%s' has %d total dependencies", pipelineName, allDependencies.size()));
+        
+        allDependencies.stream()
+            .filter(build -> {
+                boolean ignored = shouldBeIgnored(build, pipelineStartWithOffset);
+                if (ignored) {
+                    LOG.debug(format("  Filtering out build '%s' (id=%s): composite=%s, personal=%s, finished=%s",
+                        buildName(build), build.getBuildId(), build.isCompositeBuild(), 
+                        build.isPersonal(), build.getFinishDate() != null));
+                }
+                return !ignored;
+            })
+            .forEach(job -> {
+                LOG.debug(format("  Processing job '%s' (id=%s) for step extraction", 
+                    buildName(job), job.getBuildId()));
+                
+                // Create the job webhook
+                JobWebhook jobWebhook = createJobWebhook(job, pipelineName, pipelineID);
+                webhooks.add(jobWebhook);
+                
+                // Create step webhooks for this job
+                List<StepWebhook> stepWebhooks = createStepWebhooks(job, pipelineName, pipelineID);
+                webhooks.addAll(stepWebhooks);
+            });
+
+        return webhooks;
+    }
+    
+    /**
+     * Creates step webhooks from build statistics data.
+     * Each step is sent as a separate webhook event with level: "step".
+     */
+    private List<StepWebhook> createStepWebhooks(SBuild jobBuild, String pipelineName, String pipelineID) {
+        List<BuildStep> buildSteps = extractBuildSteps(jobBuild);
+        List<StepWebhook> stepWebhooks = new ArrayList<>();
+        
+        String jobUrl = buildURL(jobBuild);
+        String jobId = buildID(jobBuild);
+        String jobName = buildName(jobBuild);
+        
+        for (int i = 0; i < buildSteps.size(); i++) {
+            BuildStep step = buildSteps.get(i);
+            
+            // Create unique ID for the step
+            String stepId = jobId + "_step_" + i;
+            
+            // Convert BuildStep.StepStatus to StepWebhook.StepStatus
+            StepWebhook.StepStatus webhookStatus = convertStepStatus(step.getStatus());
+            
+            // Create error info if step has error
+            JobWebhook.ErrorInfo errorInfo = null;
+            if (step.getError() != null) {
+                errorInfo = new JobWebhook.ErrorInfo(
+                    step.getError(), 
+                    "StepFailure", 
+                    JobWebhook.ErrorInfo.ErrorDomain.PROVIDER
+                );
+            }
+            
+            StepWebhook stepWebhook = new StepWebhook(
+                step.getName(),
+                jobUrl,  // Step URLs typically point to the job
+                step.getStart(),
+                step.getEnd(),
+                jobId,        // job_id (optional)
+                jobName,      // job_name (optional)
+                pipelineID,   // pipeline_unique_id (required)
+                pipelineName, // pipeline_name (required)
+                stepId,
+                webhookStatus,
+                errorInfo
+            );
+            
+            stepWebhooks.add(stepWebhook);
+        }
+        
+        return stepWebhooks;
+    }
+    
+    private StepWebhook.StepStatus convertStepStatus(BuildStep.StepStatus status) {
+        // Datadog only supports SUCCESS and ERROR for step-level events
+        // Map CANCELED and SKIPPED to ERROR as fallback
+        switch (status) {
+            case SUCCESS: return StepWebhook.StepStatus.SUCCESS;
+            case ERROR:
+            case CANCELED:
+            case SKIPPED:
+                return StepWebhook.StepStatus.ERROR;
+            default: throw new IllegalArgumentException("Unknown step status: " + status);
+        }
     }
 
     private boolean shouldBeIgnored(SBuild jobBuild, Date pipelineStart) {
@@ -182,12 +277,6 @@ public class BuildChainProcessor {
 
         getHostInfo(jobBuild).ifPresent(jobWebhook::setHostInfo);
         getErrorInfo(jobBuild).ifPresent(jobWebhook::setErrorInfo);
-        
-        // Extract and add build steps
-        List<BuildStep> buildSteps = extractBuildSteps(jobBuild);
-        if (!buildSteps.isEmpty()) {
-            jobWebhook.setSteps(buildSteps);
-        }
         
         // EXPERIMENTAL: Investigate build statistics for step timing information
         logBuildStatistics(jobBuild);
