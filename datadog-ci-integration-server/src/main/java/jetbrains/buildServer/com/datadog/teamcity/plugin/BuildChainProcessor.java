@@ -262,76 +262,130 @@ public class BuildChainProcessor {
     /**
      * Extract build step information from TeamCity build statistics and configuration.
      * Returns a list of BuildStep objects with timing and status information.
+     * Includes both user-defined build steps and TeamCity build stages (VCS checkout, artifacts publishing).
      */
     private List<BuildStep> extractBuildSteps(SBuild build) {
         Map<String, BigDecimal> stats = build.getStatisticValues();
-        String buildStepPrefix = "buildStageDuration:buildStep";
+        String stageDurationPrefix = "buildStageDuration:";
         
-        // Find all build step timing entries in statistics
-        Map<String, Long> stepTimings = stats.entrySet().stream()
-            .filter(entry -> entry.getKey().startsWith(buildStepPrefix))
-            .collect(HashMap::new, 
-                (map, entry) -> {
-                    // Extract step ID from key like "buildStageDuration:buildSteptest_step_1"
-                    String stepId = entry.getKey().substring(buildStepPrefix.length());
-                    long durationMs = entry.getValue().longValue();
-                    map.put(stepId, durationMs);
-                },
-                HashMap::putAll);
+        // Extract all build stage durations (includes VCS, steps, artifacts, etc.)
+        Map<String, Long> stageDurations = new HashMap<>();
+        stats.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(stageDurationPrefix))
+            .forEach(entry -> {
+                String stageId = entry.getKey().substring(stageDurationPrefix.length());
+                long durationMs = entry.getValue().longValue();
+                stageDurations.put(stageId, durationMs);
+            });
         
-        if (stepTimings.isEmpty()) {
-            LOG.debug(format("No build step timing data found for build '%s' (id=%s)", buildName(build), build.getBuildId()));
+        if (stageDurations.isEmpty()) {
+            LOG.debug(format("No build stage timing data found for build '%s' (id=%s)", buildName(build), build.getBuildId()));
             return new ArrayList<>();
         }
         
-        LOG.debug(format("Found %d build steps in statistics for build '%s' (id=%s)", 
-            stepTimings.size(), buildName(build), build.getBuildId()));
+        LOG.debug(format("Found %d build stages in statistics for build '%s' (id=%s)", 
+            stageDurations.size(), buildName(build), build.getBuildId()));
         
         // Get build configuration to map step IDs to names
         List<jetbrains.buildServer.serverSide.SBuildRunnerDescriptor> runners = 
             build.getBuildType().getBuildRunners();
+        Map<String, String> stepIdToName = new HashMap<>();
+        runners.forEach(runner -> stepIdToName.put(runner.getId(), runner.getName()));
         
-        // Create a map of step ID to step name
-        Map<String, String> stepIdToName = runners.stream()
-            .collect(HashMap::new,
-                (map, runner) -> map.put(runner.getId(), runner.getName()),
-                HashMap::putAll);
-        
-        // Create BuildStep objects
+        // Build steps in execution order
         List<BuildStep> buildSteps = new ArrayList<>();
         Date buildStart = build.getStartDate();
         long currentOffset = 0;
         
-        // Steps are ordered by execution, so we can calculate start/end times
-        for (Map.Entry<String, Long> entry : stepTimings.entrySet()) {
-            String stepId = entry.getKey();
-            long durationMs = entry.getValue();
-            String stepName = stepIdToName.getOrDefault(stepId, stepId);
+        // Define the expected execution order of build stages
+        String[] stageOrder = {
+            "sourcesUpdate",           // VCS checkout
+            "toolsUpdating",           // Tool updates
+            "firstStepPreparation",    // Pre-step preparation
+            // buildStep* entries will be inserted here dynamically
+            "buildFinishing",          // Post-build cleanup
+            "artifactsPublishing"      // Artifact upload
+        };
+        
+        // Process stages in order
+        for (String stageId : stageOrder) {
+            if (stageDurations.containsKey(stageId)) {
+                long durationMs = stageDurations.remove(stageId);
+                String stepName = getStepDisplayName(stageId);
+                
+                Date stepStart = new Date(buildStart.getTime() + currentOffset);
+                Date stepEnd = new Date(stepStart.getTime() + durationMs);
+                
+                BuildStep step = new BuildStep(
+                    stepName,
+                    toRFC3339(stepStart),
+                    toRFC3339(stepEnd),
+                    durationMs,
+                    BuildStep.StepStatus.SUCCESS,
+                    null
+                );
+                
+                buildSteps.add(step);
+                LOG.debug(format("  Stage '%s' (id=%s): duration=%dms, start=%s, end=%s", 
+                    stepName, stageId, durationMs, toRFC3339(stepStart), toRFC3339(stepEnd)));
+                
+                currentOffset += durationMs;
+            }
             
-            // Calculate timestamps
-            Date stepStart = new Date(buildStart.getTime() + currentOffset);
-            Date stepEnd = new Date(stepStart.getTime() + durationMs);
-            
-            BuildStep buildStep = new BuildStep(
-                stepName,
-                toRFC3339(stepStart),
-                toRFC3339(stepEnd),
-                durationMs,
-                BuildStep.StepStatus.SUCCESS, // TODO: determine actual status
-                null // TODO: extract error message if failed
-            );
-            
-            LOG.debug(format("  Step '%s' (id=%s): duration=%dms, start=%s, end=%s", 
-                stepName, stepId, durationMs, toRFC3339(stepStart), toRFC3339(stepEnd)));
-            
-            buildSteps.add(buildStep);
-            currentOffset += durationMs;
+            // After firstStepPreparation, insert actual build steps
+            if ("firstStepPreparation".equals(stageId)) {
+                List<String> buildStepIds = new ArrayList<>();
+                stageDurations.keySet().stream()
+                    .filter(key -> key.startsWith("buildStep"))
+                    .forEach(buildStepIds::add);
+                
+                // Sort build steps (they should be in order, but ensure it)
+                buildStepIds.sort(String::compareTo);
+                
+                for (String buildStepId : buildStepIds) {
+                    long durationMs = stageDurations.remove(buildStepId);
+                    String stepId = buildStepId.substring("buildStep".length());
+                    String stepName = stepIdToName.getOrDefault(stepId, stepId);
+                    
+                    Date stepStart = new Date(buildStart.getTime() + currentOffset);
+                    Date stepEnd = new Date(stepStart.getTime() + durationMs);
+                    
+                    BuildStep step = new BuildStep(
+                        stepName,
+                        toRFC3339(stepStart),
+                        toRFC3339(stepEnd),
+                        durationMs,
+                        BuildStep.StepStatus.SUCCESS,
+                        null
+                    );
+                    
+                    buildSteps.add(step);
+                    LOG.debug(format("  Step '%s' (id=%s): duration=%dms, start=%s, end=%s", 
+                        stepName, stepId, durationMs, toRFC3339(stepStart), toRFC3339(stepEnd)));
+                    
+                    currentOffset += durationMs;
+                }
+            }
         }
         
         LOG.debug(format("Successfully extracted %d build steps for build '%s' (id=%s)", 
             buildSteps.size(), buildName(build), build.getBuildId()));
         
         return buildSteps;
+    }
+    
+    /**
+     * Get user-friendly display name for TeamCity build stages.
+     */
+    private String getStepDisplayName(String stageId) {
+        switch (stageId) {
+            case "sourcesUpdate": return "Checkout";
+            case "toolsUpdating": return "Update Tools";
+            case "firstStepPreparation": return "Preparation";
+            case "buildFinishing": return "Finalize Build";
+            case "artifactsPublishing": return "Publish Artifacts";
+            default: return stageId;
+        }
     }
     
     /**
