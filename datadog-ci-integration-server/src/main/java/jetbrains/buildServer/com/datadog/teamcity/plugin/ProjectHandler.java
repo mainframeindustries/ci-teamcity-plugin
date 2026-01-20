@@ -26,16 +26,19 @@ public class ProjectHandler {
     protected static final String DATADOG_API_KEY_PARAM = "datadog.ci.api.key";
     protected static final String DATADOG_SITE_PARAM = "datadog.ci.site";
     protected static final String DATADOG_ENABLED_PARAM = "datadog.ci.enabled";
-
+    protected static final String DATADOG_BATCH_SIZE_PARAM = "datadog.ci.batch.size";
+    
     // Parameter defaults registry: If it is missing than a value is required.
     private static final Map<String, String> PARAMETER_DEFAULTS = new HashMap<String, String>() {{
         put(DATADOG_ENABLED_PARAM, "false");
+        put(DATADOG_BATCH_SIZE_PARAM, "20");
     }};
 
     public ProjectParameters getProjectParameters(SBuild build) {
         String apiKey = getBuildParameter(build, DATADOG_API_KEY_PARAM);
         String ddSite = getBuildParameter(build, DATADOG_SITE_PARAM);
-        return new ProjectParameters(apiKey, ddSite);
+        int batchSize = getBatchSize(build);
+        return new ProjectParameters(apiKey, ddSite, batchSize);
     }
 
     public boolean isPluginEnabled(SBuild build) {
@@ -89,14 +92,32 @@ public class ProjectHandler {
         
         return result;
     }
+    
+    private int getBatchSize(SBuild build) {
+        String batchSizeStr = getBuildParameter(build, DATADOG_BATCH_SIZE_PARAM);
+        
+        try {
+            int batchSize = Integer.parseInt(batchSizeStr.trim());
+            if (batchSize > 0) {
+                return batchSize;
+            }
+        } catch (NumberFormatException e) {}
+        
+        int defaultBatchSize = Integer.parseInt(PARAMETER_DEFAULTS.get(DATADOG_BATCH_SIZE_PARAM));
+        LOG.warn(format("Invalid batch size value '%s' for build %s. Using default: %d", 
+            batchSizeStr, build.getBuildId(), defaultBatchSize));
+        return defaultBatchSize;
+    }
 
     public static class ProjectParameters {
         private final String apiKey;
         private final String ddSite;
+        private final int batchSize;
 
-        public ProjectParameters(String apiKey, String ddSite) {
+        public ProjectParameters(String apiKey, String ddSite, int batchSize) {
             this.apiKey = apiKey;
             this.ddSite = ddSite;
+            this.batchSize = batchSize;
         }
 
         public String apiKey() {
@@ -105,6 +126,10 @@ public class ProjectHandler {
 
         public String ddSite() {
             return ddSite;
+        }
+        
+        public int batchSize() {
+            return batchSize;
         }
     }
 }
