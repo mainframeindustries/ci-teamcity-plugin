@@ -7,6 +7,7 @@
 
 package jetbrains.buildServer.com.datadog.teamcity.plugin;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.intellij.openapi.diagnostic.Logger;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.ProjectHandler.ProjectParameters;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.BuildStep;
