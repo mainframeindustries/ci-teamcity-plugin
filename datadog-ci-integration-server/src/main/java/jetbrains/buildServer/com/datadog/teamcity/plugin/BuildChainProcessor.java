@@ -7,6 +7,7 @@
 
 package jetbrains.buildServer.com.datadog.teamcity.plugin;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.intellij.openapi.diagnostic.Logger;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.ProjectHandler.ProjectParameters;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.BuildStep;
@@ -263,8 +264,17 @@ public class BuildChainProcessor {
      * Extract build step information from TeamCity build statistics and configuration.
      * Returns a list of BuildStep objects with timing and status information.
      * Includes both user-defined build steps and TeamCity build stages (VCS checkout, artifacts publishing).
+     * 
+     * <p><b>Limitation:</b> TeamCity's public Java API (as of 2021.2) does not expose step-level status 
+     * (success/failure/error) through build statistics or SBuildRunnerDescriptor. All steps are marked 
+     * as SUCCESS regardless of actual outcome. Only step timing data is available via buildStageDuration 
+     * statistics. Build-level status is available via SBuild.getBuildStatus().</p>
+     * 
+     * <p>Steps that did not execute (e.g., due to previous step failures) will not have 
+     * buildStageDuration entries and thus will not appear in the returned list.</p>
      */
-    private List<BuildStep> extractBuildSteps(SBuild build) {
+    @VisibleForTesting
+    List<BuildStep> extractBuildSteps(SBuild build) {
         Map<String, BigDecimal> stats = build.getStatisticValues();
         String stageDurationPrefix = "buildStageDuration:";
         

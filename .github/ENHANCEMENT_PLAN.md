@@ -1,32 +1,62 @@
 # TeamCity Plugin Enhancement Project Plan
 
-**Status:** Planning Phase  
+**Status:** Phase 1 Complete ✅  
 **Last Updated:** January 20, 2026
 
 ## Overview
 Enhance the Datadog CI TeamCity Integration plugin to support:
-1. Build step timing information
+1. ✅ Build step timing information (COMPLETE)
 2. Multiple VCS systems (Perforce)
 3. Manual triggers and personal builds
 4. Multiple VCS configurations
 
 ---
 
-## Getting Started: Build Step Timing (Priority #1)
+## Getting Started: Build Step Timing (Priority #1) - ✅ COMPLETE
 
-**Rationale:** Starting with build step timing is the most straightforward way to get familiar with both the TeamCity API and the Datadog webhook ingestion API. It's a contained feature that touches core parts of the codebase without requiring major refactoring.
+**Status:** ✅ **Implemented and tested** on build-step-timing branch
+
+**What was delivered:**
+- Build step timing extraction via TeamCity statistics API
+- Includes all build stages: VCS checkout, tool updates, user steps, finalization, artifact publishing
+- Accurate timestamp calculation based on execution order
+- Steps added to JobWebhook payload sent to Datadog
+
+**Known Limitation:**
+- Step-level status detection not possible via TeamCity public API (2021.2)
+- All steps marked as SUCCESS (timing data only)
+- Documented in code and below
 
 ---
 
-## 1. Add Build Step Timing Information
+## 1. Add Build Step Timing Information - ✅ COMPLETE
 
 ### Goals
-- Extract timing for individual build steps (not just jobs)
-- Include step-level metrics in webhooks
-- Maintain backward compatibility
-- **Learn the TeamCity API and Datadog ingestion API**
+- ✅ Extract timing for individual build steps (not just jobs)
+- ✅ Include step-level metrics in webhooks
+- ✅ Maintain backward compatibility
+- ✅ **Learn the TeamCity API and Datadog ingestion API**
 
-### Current State
+### Implementation Summary
+- **API Used:** `SBuild.getStatisticValues()` provides `buildStageDuration:*` entries
+- **Stages Tracked:** sourcesUpdate, toolsUpdating, firstStepPreparation, buildStep*, buildFinishing, artifactsPublishing
+- **Method:** `BuildChainProcessor.extractBuildSteps()`
+- **Data Model:** `BuildStep.java` with name, start, end, duration, status
+- **Integration:** Steps added via `JobWebhook.setSteps()`
+
+### Known API Limitation
+⚠️ **TeamCity does not expose step-level status via public API**
+- Build statistics contain timing only, not success/failure status
+- `SBuildRunnerDescriptor` is configuration-only (no execution data)
+- `BuildProblemData` is build-level, doesn't identify which step failed
+- All steps are marked as `SUCCESS` regardless of outcome
+- Steps that didn't run (due to failures) are absent from statistics
+
+This limitation is documented in:
+- `BuildChainProcessor.extractBuildSteps()` javadoc
+- `BuildStep.java` class javadoc
+
+### Current State (Before Implementation)
 - Only track job-level timing (start, end, queue time)
 - No step-level granularity
 - Webhooks sent to: `https://webhook-intake.{ddSite}/api/v2/webhook`
