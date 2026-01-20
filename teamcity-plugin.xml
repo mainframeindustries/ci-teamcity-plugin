@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <teamcity-plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:schemas-jetbrains-com:teamcity-plugin-v1-xml">
   <info>
-    <name>datadog-ci-integration</name>
-    <display-name>Datadog CI Integration</display-name>
-    <version>0.0.5</version>
-    <description>Integrates TeamCity with Datadog CI Visibility.</description>
+    <name>datadog-ci-integration-dev</name>
+    <display-name>Datadog CI Integration (Dev)</display-name>
+    <version>0.0.6-dev</version>
+    <description>Integrates TeamCity with Datadog CI Visibility (Development Build).</description>
     <vendor>
       <name>Datadog</name>
       <url>https://www.datadoghq.com/</url>

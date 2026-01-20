@@ -24,6 +24,9 @@ import jetbrains.buildServer.serverSide.SBuildServer;
 import jetbrains.buildServer.serverSide.ServerSettings;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
+import java.util.Map;
+
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -79,6 +82,9 @@ public class BuildChainProcessor {
     }
 
     public void process(SBuild pipelineBuild) {
+        // EXPERIMENTAL: Log build statistics to investigate step timing data
+        logBuildStatistics(pipelineBuild);
+        
         ProjectParameters params = projectHandler.getProjectParameters(pipelineBuild);
         List<Webhook> webhooks = createWebhooks(pipelineBuild);
 
@@ -176,6 +182,10 @@ public class BuildChainProcessor {
 
         getHostInfo(jobBuild).ifPresent(jobWebhook::setHostInfo);
         getErrorInfo(jobBuild).ifPresent(jobWebhook::setErrorInfo);
+        
+        // EXPERIMENTAL: Investigate build statistics for step timing information
+        logBuildStatistics(jobBuild);
+        
         return jobWebhook;
     }
 
@@ -243,4 +253,30 @@ public class BuildChainProcessor {
         // Server ID is included to avoid build ID conflicts on different TC instances within the same org
         return format("%s-%s", serverSettings.getServerUUID(), build.getBuildId());
     }
+    
+    /**
+     * EXPERIMENTAL: Log build statistics to investigate what information is available
+     * for extracting build step timing data.
+     */
+    private void logBuildStatistics(SBuild build) {
+        try {
+            Map<String, BigDecimal> stats = build.getStatisticValues();
+            LOG.debug(format("=== Build Statistics for '%s' (id=%s) ===", buildName(build), build.getBuildId()));
+            LOG.debug(format("Total statistics entries: %d", stats.size()));
+            
+            if (stats.isEmpty()) {
+                LOG.debug("No statistics available for this build");
+            } else {
+                // Log all statistics keys to see what's available
+                LOG.debug("Available statistics keys:");
+                stats.forEach((key, value) -> {
+                    LOG.debug(format("  %s = %s", key, value));
+                });
+            }
+            LOG.debug("=== End Build Statistics ===");
+        } catch (Exception e) {
+            LOG.warn(format("Failed to retrieve statistics for build %s: %s", buildName(build), e.getMessage()), e);
+        }
+    }
 }
+

@@ -62,12 +62,12 @@ public class ProjectHandler {
     }
 
     public boolean shouldProcessAllBuilds(SBuild build) {
-        ProjectEx project = getProject(build);
-        String processAll = project.getParameterValue(DATADOG_PROCESS_ALL_BUILDS_PARAM);
+        String processAll = build.getBuildType().getParameters().get(DATADOG_PROCESS_ALL_BUILDS_PARAM);
         boolean shouldProcessAll = Boolean.parseBoolean(processAll);
-        if (shouldProcessAll) {
-            LOG.debug(format("Process all builds enabled for project '%s'", project.getFullName()));
-        }
+        
+        LOG.debug(format("Process all builds parameter for '%s': value='%s', result=%s", 
+            build.getFullName(), processAll, shouldProcessAll));
+        
         return shouldProcessAll;
     }
 
