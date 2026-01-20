@@ -56,7 +56,10 @@ public class DatadogServerAdapter extends BuildServerAdapter {
             return;
         }
 
-        if (!isLastCompositeBuild(build)) {
+        // Allow processing all builds when testing/debugging
+        boolean processAllBuilds = projectHandler.shouldProcessAllBuilds(build);
+        
+        if (!processAllBuilds && !isLastCompositeBuild(build)) {
             LOG.info(format("Ignoring build with id '%s' and name '%s'", build.getBuildId(), buildName(build)));
             return;
         }

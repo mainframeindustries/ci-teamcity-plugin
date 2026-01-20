@@ -28,6 +28,7 @@ public class ProjectHandler {
     protected static final String DATADOG_API_KEY_PARAM = "datadog.ci.api.key";
     protected static final String DATADOG_SITE_PARAM = "datadog.ci.site";
     protected static final String DATADOG_ENABLED_PARAM = "datadog.ci.enabled";
+    protected static final String DATADOG_PROCESS_ALL_BUILDS_PARAM = "datadog.ci.process.all.builds";
 
     private final ProjectManager projectManager;
 
@@ -58,6 +59,16 @@ public class ProjectHandler {
         }
 
         return isPluginEnabled;
+    }
+
+    public boolean shouldProcessAllBuilds(SBuild build) {
+        ProjectEx project = getProject(build);
+        String processAll = project.getParameterValue(DATADOG_PROCESS_ALL_BUILDS_PARAM);
+        boolean shouldProcessAll = Boolean.parseBoolean(processAll);
+        if (shouldProcessAll) {
+            LOG.debug(format("Process all builds enabled for project '%s'", project.getFullName()));
+        }
+        return shouldProcessAll;
     }
 
     @Nonnull
