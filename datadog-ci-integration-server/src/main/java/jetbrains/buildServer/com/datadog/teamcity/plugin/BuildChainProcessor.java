@@ -9,6 +9,7 @@ package jetbrains.buildServer.com.datadog.teamcity.plugin;
 
 import com.intellij.openapi.diagnostic.Logger;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.ProjectHandler.ProjectParameters;
+import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.BuildStep;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.GitInfo;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebhook.ErrorInfo;
@@ -25,8 +26,6 @@ import jetbrains.buildServer.serverSide.ServerSettings;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.Map;
-
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -183,6 +182,12 @@ public class BuildChainProcessor {
         getHostInfo(jobBuild).ifPresent(jobWebhook::setHostInfo);
         getErrorInfo(jobBuild).ifPresent(jobWebhook::setErrorInfo);
         
+        // Extract and add build steps
+        List<BuildStep> buildSteps = extractBuildSteps(jobBuild);
+        if (!buildSteps.isEmpty()) {
+            jobWebhook.setSteps(buildSteps);
+        }
+        
         // EXPERIMENTAL: Investigate build statistics for step timing information
         logBuildStatistics(jobBuild);
         
@@ -252,6 +257,71 @@ public class BuildChainProcessor {
     private String buildID(SBuild build) {
         // Server ID is included to avoid build ID conflicts on different TC instances within the same org
         return format("%s-%s", serverSettings.getServerUUID(), build.getBuildId());
+    }
+    
+    /**
+     * Extract build step information from TeamCity build statistics and configuration.
+     * Returns a list of BuildStep objects with timing and status information.
+     */
+    private List<BuildStep> extractBuildSteps(SBuild build) {
+        Map<String, BigDecimal> stats = build.getStatisticValues();
+        String buildStepPrefix = "buildStageDuration:buildStep";
+        
+        // Find all build step timing entries in statistics
+        Map<String, Long> stepTimings = stats.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(buildStepPrefix))
+            .collect(HashMap::new, 
+                (map, entry) -> {
+                    // Extract step ID from key like "buildStageDuration:buildSteptest_step_1"
+                    String stepId = entry.getKey().substring(buildStepPrefix.length());
+                    long durationMs = entry.getValue().longValue();
+                    map.put(stepId, durationMs);
+                },
+                HashMap::putAll);
+        
+        if (stepTimings.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        // Get build configuration to map step IDs to names
+        List<jetbrains.buildServer.serverSide.SBuildRunnerDescriptor> runners = 
+            build.getBuildType().getBuildRunners();
+        
+        // Create a map of step ID to step name
+        Map<String, String> stepIdToName = runners.stream()
+            .collect(HashMap::new,
+                (map, runner) -> map.put(runner.getId(), runner.getName()),
+                HashMap::putAll);
+        
+        // Create BuildStep objects
+        List<BuildStep> buildSteps = new ArrayList<>();
+        Date buildStart = build.getStartDate();
+        long currentOffset = 0;
+        
+        // Steps are ordered by execution, so we can calculate start/end times
+        for (Map.Entry<String, Long> entry : stepTimings.entrySet()) {
+            String stepId = entry.getKey();
+            long durationMs = entry.getValue();
+            String stepName = stepIdToName.getOrDefault(stepId, stepId);
+            
+            // Calculate timestamps
+            Date stepStart = new Date(buildStart.getTime() + currentOffset);
+            Date stepEnd = new Date(stepStart.getTime() + durationMs);
+            
+            BuildStep buildStep = new BuildStep(
+                stepName,
+                toRFC3339(stepStart),
+                toRFC3339(stepEnd),
+                durationMs,
+                BuildStep.StepStatus.SUCCESS, // TODO: determine actual status
+                null // TODO: extract error message if failed
+            );
+            
+            buildSteps.add(buildStep);
+            currentOffset += durationMs;
+        }
+        
+        return buildSteps;
     }
     
     /**
