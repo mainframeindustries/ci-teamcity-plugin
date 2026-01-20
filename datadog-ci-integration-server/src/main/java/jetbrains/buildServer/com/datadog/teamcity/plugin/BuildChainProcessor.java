@@ -280,8 +280,12 @@ public class BuildChainProcessor {
                 HashMap::putAll);
         
         if (stepTimings.isEmpty()) {
+            LOG.debug(format("No build step timing data found for build '%s' (id=%s)", buildName(build), build.getBuildId()));
             return new ArrayList<>();
         }
+        
+        LOG.debug(format("Found %d build steps in statistics for build '%s' (id=%s)", 
+            stepTimings.size(), buildName(build), build.getBuildId()));
         
         // Get build configuration to map step IDs to names
         List<jetbrains.buildServer.serverSide.SBuildRunnerDescriptor> runners = 
@@ -317,9 +321,15 @@ public class BuildChainProcessor {
                 null // TODO: extract error message if failed
             );
             
+            LOG.debug(format("  Step '%s' (id=%s): duration=%dms, start=%s, end=%s", 
+                stepName, stepId, durationMs, toRFC3339(stepStart), toRFC3339(stepEnd)));
+            
             buildSteps.add(buildStep);
             currentOffset += durationMs;
         }
+        
+        LOG.debug(format("Successfully extracted %d build steps for build '%s' (id=%s)", 
+            buildSteps.size(), buildName(build), build.getBuildId()));
         
         return buildSteps;
     }
