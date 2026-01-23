@@ -17,7 +17,10 @@ import jetbrains.buildServer.vcs.impl.VcsModificationEx;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Nonnull;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 import static java.lang.String.format;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.toRFC3339;
@@ -28,14 +31,22 @@ public class GitInformationExtractor {
     protected static final String USERNAME_STYLE_PROPERTY = "usernameStyle";
     protected static final String URL_PROPERTY = "url";
     protected static final String BRANCH_PROPERTY = "branch";
+    protected static final String PORT_PROPERTY = "port";
+    protected static final String STREAM_PROPERTY = "stream";
     protected static final String GIT_VCS = "jetbrains.git";
+    protected static final String PERFORCE_VCS = "perforce";
     protected static final String DEFAULT_EMAIL_DOMAIN = "TeamCity";
+    
+    protected static final Set<String> SUPPORTED_VCS_TYPES = new HashSet<>(Arrays.asList(
+        GIT_VCS,
+        PERFORCE_VCS
+    ));
 
     private static final Logger LOG = Logger.getInstance(GitInformationExtractor.class.getName());
 
     public Optional<GitInfo> extractGitInfo(SBuild build) {
         Optional<BuildRevision> revisionOptional = build.getRevisions().stream()
-            .filter(this::hasGitRoot)
+            .filter(this::isSupportedVcs)
             .findFirst();
         if (!revisionOptional.isPresent()) {
             LOG.warn(format("Could not find revision for build '%s'. Revisions: %s", build, build.getRevisions()));
@@ -44,37 +55,76 @@ public class GitInformationExtractor {
 
         BuildRevision revision = revisionOptional.get();
         VcsRootInstanceEx vcsRootInstance = (VcsRootInstanceEx) revision.getRoot();
-        VcsModificationEx gitModification = (VcsModificationEx) vcsRootInstance.findModificationByVersion(revision.getRevision());
+        VcsModificationEx vcsModification = (VcsModificationEx) vcsRootInstance.findModificationByVersion(revision.getRevision());
 
-        if (gitModification == null) {
+        if (vcsModification == null) {
             LOG.warn(format("Could not find modification for revision '%s' from VCS root '%s'", revision, vcsRootInstance));
             return Optional.empty();
         }
 
-        UsernameStyle usernameStyle = getUsernameStyle(vcsRootInstance);
-        GitUserInfo committerInfo = extractCommitterInfo(gitModification, usernameStyle);
-        GitUserInfo authorInfo = tryExtractAuthorInfo(gitModification, usernameStyle)
+        String vcsType = vcsRootInstance.getVcsName();
+        GitInfo gitInfo;
+        
+        if (GIT_VCS.equalsIgnoreCase(vcsType)) {
+            gitInfo = extractFromGit(vcsRootInstance, vcsModification, build);
+        } else if (PERFORCE_VCS.equalsIgnoreCase(vcsType)) {
+            gitInfo = extractFromPerforce(vcsRootInstance, vcsModification, build);
+        } else {
+            LOG.warn(format("Unsupported VCS type '%s' for build '%s'", vcsType, build.getBuildId()));
+            return Optional.empty();
+        }
+
+        return Optional.of(gitInfo);
+    }
+
+    private GitInfo extractFromGit(VcsRootInstanceEx vcsRootInstance, VcsModificationEx vcsModification, SBuild build) {
+        UsernameStyle usernameStyle = getUsernameStyleForGit(vcsRootInstance);
+        GitUserInfo committerInfo = extractCommitterInfo(vcsModification, usernameStyle);
+        GitUserInfo authorInfo = tryExtractAuthorInfo(vcsModification, usernameStyle)
             .orElse(committerInfo);
 
-        return Optional.of(new GitInfo()
+        return new GitInfo()
             .withRepositoryURL(vcsRootInstance.getProperty(URL_PROPERTY))
             .withDefaultBranch(vcsRootInstance.getProperty(BRANCH_PROPERTY))
-            .withMessage(gitModification.getDescription().trim())
-            .withSha(gitModification.getVersion())
-            .withCommitTime(toRFC3339(gitModification.getCommitDate()))
+            .withMessage(vcsModification.getDescription().trim())
+            .withSha(vcsModification.getVersion())
+            .withCommitTime(toRFC3339(vcsModification.getVcsDate()))
             .withCommitterName(committerInfo.username)
             .withCommitterEmail(committerInfo.email)
-            .withAuthorTime(toRFC3339(gitModification.getVcsDate()))
+            .withAuthorTime(toRFC3339(vcsModification.getVcsDate()))
             .withAuthorName(authorInfo.username)
             .withAuthorEmail(authorInfo.email)
-            .withBranch(getBranch(build)));
+            .withBranch(getBranch(build));
     }
 
-    private boolean hasGitRoot(BuildRevision rev) {
-        return rev.getRoot().getVcsName().equalsIgnoreCase(GIT_VCS);
+    private GitInfo extractFromPerforce(VcsRootInstanceEx vcsRootInstance, VcsModificationEx vcsModification, SBuild build) {
+        // Perforce uses NAME style for username (no email formatting)
+        UsernameStyle usernameStyle = UsernameStyle.NAME;
+        GitUserInfo committerInfo = extractCommitterInfo(vcsModification, usernameStyle);
+        GitUserInfo authorInfo = tryExtractAuthorInfo(vcsModification, usernameStyle)
+            .orElse(committerInfo);
+
+        return new GitInfo()
+            .withRepositoryURL(vcsRootInstance.getProperty(PORT_PROPERTY))
+            .withDefaultBranch(vcsRootInstance.getProperty(STREAM_PROPERTY))
+            .withMessage(vcsModification.getDescription().trim())
+            .withSha(vcsModification.getVersion())
+            .withCommitTime(toRFC3339(vcsModification.getVcsDate()))
+            .withCommitterName(committerInfo.username)
+            .withCommitterEmail(committerInfo.email)
+            .withAuthorTime(toRFC3339(vcsModification.getVcsDate()))
+            .withAuthorName(authorInfo.username)
+            .withAuthorEmail(authorInfo.email)
+            .withBranch(getBranch(build));
     }
 
-    private UsernameStyle getUsernameStyle(VcsRootInstanceEx vcsRootInstance) {
+    private boolean isSupportedVcs(BuildRevision rev) {
+        String vcsName = rev.getRoot().getVcsName();
+        return SUPPORTED_VCS_TYPES.stream()
+            .anyMatch(supportedVcs -> supportedVcs.equalsIgnoreCase(vcsName));
+    }
+
+    private UsernameStyle getUsernameStyleForGit(VcsRootInstanceEx vcsRootInstance) {
         String usernameStyle = vcsRootInstance.getProperty(USERNAME_STYLE_PROPERTY);
         if (usernameStyle == null || usernameStyle.isEmpty()) {
             throw new IllegalArgumentException("Could not retrieve username style from VCS root properties: " + vcsRootInstance.getProperties());

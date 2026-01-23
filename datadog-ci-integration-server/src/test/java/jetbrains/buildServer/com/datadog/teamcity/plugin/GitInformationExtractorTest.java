@@ -22,6 +22,7 @@ import static java.util.Collections.singletonList;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.toRFC3339;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.DEFAULT_EMAIL_DOMAIN;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.GIT_VCS;
+import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.PERFORCE_VCS;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.UsernameStyle.EMAIL;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.UsernameStyle.FULL;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.UsernameStyle.NAME;
@@ -211,6 +212,98 @@ public class GitInformationExtractorTest {
             .build();
 
         gitInfoExtractor.extractGitInfo(build);
+    }
+
+    @Test
+    public void shouldExtractPerforceInformation() {
+        // Setup: Perforce build with simple username
+        String perforcePort = "ssl:perforce.example.com:1666";
+        String perforceStream = "//project/main";
+        String perforceVersion = "//project/main|12345";
+        String perforceCommitter = "build";
+        String perforceMessage = "Fixed bug in rendering system";
+        
+        SBuild build = new MockBuild.Builder(1, PIPELINE)
+            .addPerforceRevision(perforcePort, perforceStream, perforceVersion, perforceCommitter, perforceMessage)
+            .build();
+
+        // When
+        Optional<GitInfo> gitInfoOptional = gitInfoExtractor.extractGitInfo(build);
+
+        // Then
+        assertThat(gitInfoOptional).isNotEmpty();
+        GitInfo expectedGitInfo = new GitInfo()
+            .withRepositoryURL(perforcePort)
+            .withDefaultBranch(perforceStream)
+            .withSha(perforceVersion)
+            .withMessage(perforceMessage)
+            .withCommitterName(perforceCommitter)
+            .withCommitterEmail("build@teamcity")
+            .withAuthorName(perforceCommitter)
+            .withAuthorEmail("build@teamcity")
+            .withBranch(DEFAULT_BRANCH)
+            .withCommitTime(toRFC3339(DEFAULT_COMMIT_DATE))
+            .withAuthorTime(toRFC3339(DEFAULT_COMMIT_DATE));
+        
+        assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
+    }
+
+    @Test
+    public void shouldGenerateEmailForPerforceUsername() {
+        // Setup: Perforce with username that has spaces
+        String perforcePort = "ssl:perforce.example.com:1666";
+        String perforceStream = "//project/main";
+        String perforceVersion = "//tasks/feature_branch|67890";
+        String perforceCommitter = "John Doe";
+        String perforceMessage = "Added new feature";
+        
+        SBuild build = new MockBuild.Builder(1, PIPELINE)
+            .addPerforceRevision(perforcePort, perforceStream, perforceVersion, perforceCommitter, perforceMessage)
+            .build();
+
+        // When
+        Optional<GitInfo> gitInfoOptional = gitInfoExtractor.extractGitInfo(build);
+
+        // Then
+        assertThat(gitInfoOptional).isNotEmpty();
+        GitInfo expectedGitInfo = new GitInfo()
+            .withRepositoryURL(perforcePort)
+            .withDefaultBranch(perforceStream)
+            .withSha(perforceVersion)
+            .withMessage(perforceMessage)
+            .withCommitterName("John Doe")
+            .withCommitterEmail("johndoe@teamcity")
+            .withAuthorName("John Doe")
+            .withAuthorEmail("johndoe@teamcity")
+            .withBranch(DEFAULT_BRANCH)
+            .withCommitTime(toRFC3339(DEFAULT_COMMIT_DATE))
+            .withAuthorTime(toRFC3339(DEFAULT_COMMIT_DATE));
+        
+        assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
+    }
+
+    @Test
+    public void shouldPreferFirstSupportedVcsInHybridBuild() {
+        // Setup: Build with both Git and Perforce (hybrid)
+        String gitCommitter = "git-user <git@example.com>";
+        SBuild build = new MockBuild.Builder(1, PIPELINE)
+            .addRevision(GIT_VCS, FULL.name(), gitCommitter, EMPTY_AUTHOR_USERNAME)
+            .addPerforceRevision("ssl:perforce.example.com:1666", "//project/main", 
+                               "//project/main|12345", "p4-user", "Perforce change")
+            .build();
+
+        // When
+        Optional<GitInfo> gitInfoOptional = gitInfoExtractor.extractGitInfo(build);
+
+        // Then - should use first supported VCS (Git)
+        assertThat(gitInfoOptional).isNotEmpty();
+        GitInfo expectedGitInfo = defaultGitInfo()
+            .withCommitterName("git-user")
+            .withCommitterEmail("git@example.com")
+            .withAuthorName("git-user")
+            .withAuthorEmail("git@example.com");
+        
+        assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
     }
 
     private static GitInfo defaultGitInfo() {
