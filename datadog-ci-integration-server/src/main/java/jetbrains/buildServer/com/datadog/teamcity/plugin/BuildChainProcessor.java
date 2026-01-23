@@ -41,6 +41,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static jetbrains.buildServer.BuildProblemTypes.TC_FAILED_TESTS_TYPE;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.buildName;
+import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.isManualTrigger;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.isPartialRetry;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.pipelineStartWithOffset;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.queueTimeMs;
@@ -132,7 +133,8 @@ public class BuildChainProcessor {
             buildID(pipelineBuild),
             String.valueOf(pipelineBuild.getBuildId()),
             isPartialRetry(pipelineBuild),
-            getPipelineStatus(pipelineBuild));
+            getPipelineStatus(pipelineBuild),
+            isManualTrigger(pipelineBuild));
 
         if (!pipelineBuild.getTags().isEmpty()) {
             pipelineWebhook.setTags(pipelineBuild.getTags());

@@ -7,5 +7,6 @@
   "unique_id": "1",
   "pipeline_id": "1",
   "partial_retry": false,
-  "status": "success"
+  "status": "success",
+  "is_manual": false
 }

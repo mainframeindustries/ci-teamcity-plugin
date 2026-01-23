@@ -31,6 +31,9 @@ public class PipelineWebhook extends Webhook {
     @Nonnull
     private final PipelineStatus status;
 
+    @JsonProperty("is_manual")
+    private final boolean isManual;
+
     public PipelineWebhook(@Nonnull String name,
                            @Nonnull String url,
                            @Nonnull String start,
@@ -39,11 +42,24 @@ public class PipelineWebhook extends Webhook {
                            @Nonnull String pipelineId,
                            boolean partialRetry,
                            @Nonnull PipelineStatus status) {
+        this(name, url, start, end, uniqueId, pipelineId, partialRetry, status, false);
+    }
+
+    public PipelineWebhook(@Nonnull String name,
+                           @Nonnull String url,
+                           @Nonnull String start,
+                           @Nonnull String end,
+                           @Nonnull String uniqueId,
+                           @Nonnull String pipelineId,
+                           boolean partialRetry,
+                           @Nonnull PipelineStatus status,
+                           boolean isManual) {
         super(PIPELINE, name, url, start, end);
         this.uniqueId = uniqueId;
         this.pipelineId = pipelineId;
         this.partialRetry = partialRetry;
         this.status = status;
+        this.isManual = isManual;
     }
 
     @Override
@@ -53,6 +69,7 @@ public class PipelineWebhook extends Webhook {
             ", pipelineId='" + pipelineId + '\'' +
             ", partialRetry=" + partialRetry +
             ", status=" + status +
+            ", isManual=" + isManual +
             ", level=" + level +
             ", name='" + name + '\'' +
             ", url='" + url + '\'' +
@@ -81,12 +98,12 @@ public class PipelineWebhook extends Webhook {
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         PipelineWebhook that = (PipelineWebhook) o;
-        return partialRetry == that.partialRetry && uniqueId.equals(that.uniqueId) && pipelineId.equals(that.pipelineId) && status == that.status;
+        return partialRetry == that.partialRetry && isManual == that.isManual && uniqueId.equals(that.uniqueId) && pipelineId.equals(that.pipelineId) && status == that.status;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), uniqueId, pipelineId, partialRetry, status);
+        return Objects.hash(super.hashCode(), uniqueId, pipelineId, partialRetry, status, isManual);
     }
 
     public enum PipelineStatus {
