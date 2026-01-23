@@ -51,6 +51,7 @@ public class GitInformationExtractorTest {
     public void setUp() {
         projectHandler = mock(ProjectHandler.class);
         when(projectHandler.getEmailPostfix(any(SBuild.class))).thenReturn("@teamcity");
+        when(projectHandler.getVcsIndex(any(SBuild.class))).thenReturn(0);
         gitInfoExtractor = new GitInformationExtractor(projectHandler);
     }
 
@@ -348,6 +349,120 @@ public class GitInformationExtractorTest {
             .withCommitterEmail("git@example.com")
             .withAuthorName("git-user")
             .withAuthorEmail("git@example.com");
+        
+        assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
+    }
+
+    @Test
+    public void shouldUseVcsIndexToSelectRevision() {
+        // Setup: Build with both Git and Perforce, configured to use index 1 (Perforce)
+        when(projectHandler.getVcsIndex(any(SBuild.class))).thenReturn(1);
+        
+        String gitCommitter = "git-user <git@example.com>";
+        String perforcePort = "ssl:perforce.example.com:1666";
+        String perforceStream = "//project/main";
+        String perforceVersion = "//project/main|12345";
+        String perforceCommitter = "p4-user";
+        String perforceMessage = "Perforce change";
+        
+        SBuild build = new MockBuild.Builder(1, PIPELINE)
+            .addRevision(GIT_VCS, FULL.name(), gitCommitter, EMPTY_AUTHOR_USERNAME)
+            .addPerforceRevision(perforcePort, perforceStream, perforceVersion, perforceCommitter, perforceMessage)
+            .build();
+
+        // When
+        Optional<GitInfo> gitInfoOptional = gitInfoExtractor.extractGitInfo(build);
+
+        // Then - should use VCS at index 1 (Perforce)
+        assertThat(gitInfoOptional).isNotEmpty();
+        GitInfo expectedGitInfo = new GitInfo()
+            .withRepositoryURL(perforcePort)
+            .withDefaultBranch(perforceStream)
+            .withSha(perforceVersion)
+            .withMessage(perforceMessage)
+            .withCommitterName(perforceCommitter)
+            .withCommitterEmail("p4-user@teamcity")
+            .withAuthorName(perforceCommitter)
+            .withAuthorEmail("p4-user@teamcity")
+            .withBranch(DEFAULT_BRANCH)
+            .withCommitTime(toRFC3339(DEFAULT_COMMIT_DATE))
+            .withAuthorTime(toRFC3339(DEFAULT_COMMIT_DATE));
+        
+        assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
+    }
+
+    @Test
+    public void shouldUseNegativeIndexToSelectFromEnd() {
+        // Setup: Build with both Git and Perforce, configured to use index -1 (last = Perforce)
+        when(projectHandler.getVcsIndex(any(SBuild.class))).thenReturn(-1);
+        
+        String gitCommitter = "git-user <git@example.com>";
+        String perforcePort = "ssl:perforce.example.com:1666";
+        String perforceStream = "//project/main";
+        String perforceVersion = "//project/main|12345";
+        String perforceCommitter = "p4-user";
+        String perforceMessage = "Perforce change";
+        
+        SBuild build = new MockBuild.Builder(1, PIPELINE)
+            .addRevision(GIT_VCS, FULL.name(), gitCommitter, EMPTY_AUTHOR_USERNAME)
+            .addPerforceRevision(perforcePort, perforceStream, perforceVersion, perforceCommitter, perforceMessage)
+            .build();
+
+        // When
+        Optional<GitInfo> gitInfoOptional = gitInfoExtractor.extractGitInfo(build);
+
+        // Then - should use last VCS (Perforce)
+        assertThat(gitInfoOptional).isNotEmpty();
+        GitInfo expectedGitInfo = new GitInfo()
+            .withRepositoryURL(perforcePort)
+            .withDefaultBranch(perforceStream)
+            .withSha(perforceVersion)
+            .withMessage(perforceMessage)
+            .withCommitterName(perforceCommitter)
+            .withCommitterEmail("p4-user@teamcity")
+            .withAuthorName(perforceCommitter)
+            .withAuthorEmail("p4-user@teamcity")
+            .withBranch(DEFAULT_BRANCH)
+            .withCommitTime(toRFC3339(DEFAULT_COMMIT_DATE))
+            .withAuthorTime(toRFC3339(DEFAULT_COMMIT_DATE));
+        
+        assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
+    }
+
+    @Test
+    public void shouldClampIndexToValidRange() {
+        // Setup: Build with Git and Perforce, configured to use index 100 (out of bounds, should clamp to 1)
+        when(projectHandler.getVcsIndex(any(SBuild.class))).thenReturn(100);
+        
+        String gitCommitter = "git-user <git@example.com>";
+        String perforcePort = "ssl:perforce.example.com:1666";
+        String perforceStream = "//project/main";
+        String perforceVersion = "//project/main|12345";
+        String perforceCommitter = "p4-user";
+        String perforceMessage = "Perforce change";
+        
+        SBuild build = new MockBuild.Builder(1, PIPELINE)
+            .addRevision(GIT_VCS, FULL.name(), gitCommitter, EMPTY_AUTHOR_USERNAME)
+            .addPerforceRevision(perforcePort, perforceStream, perforceVersion, perforceCommitter, perforceMessage)
+            .build();
+
+        // When
+        Optional<GitInfo> gitInfoOptional = gitInfoExtractor.extractGitInfo(build);
+
+        // Then - should use last valid index (1 = Perforce)
+        assertThat(gitInfoOptional).isNotEmpty();
+        GitInfo expectedGitInfo = new GitInfo()
+            .withRepositoryURL(perforcePort)
+            .withDefaultBranch(perforceStream)
+            .withSha(perforceVersion)
+            .withMessage(perforceMessage)
+            .withCommitterName(perforceCommitter)
+            .withCommitterEmail("p4-user@teamcity")
+            .withAuthorName(perforceCommitter)
+            .withAuthorEmail("p4-user@teamcity")
+            .withBranch(DEFAULT_BRANCH)
+            .withCommitTime(toRFC3339(DEFAULT_COMMIT_DATE))
+            .withAuthorTime(toRFC3339(DEFAULT_COMMIT_DATE));
         
         assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
     }
