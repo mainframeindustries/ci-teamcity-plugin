@@ -19,8 +19,10 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static java.lang.String.format;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.toRFC3339;
@@ -50,15 +52,35 @@ public class GitInformationExtractor {
     }
 
     public Optional<GitInfo> extractGitInfo(SBuild build) {
-        Optional<BuildRevision> revisionOptional = build.getRevisions().stream()
-            .filter(this::isSupportedVcs)
-            .findFirst();
-        if (!revisionOptional.isPresent()) {
-            LOG.warn(format("Could not find revision for build '%s'. Revisions: %s", build, build.getRevisions()));
+        int vcsIndex = projectHandler.getVcsIndex(build);
+        List<BuildRevision> allRevisions = build.getRevisions();
+        
+        if (allRevisions.isEmpty()) {
+            LOG.warn(format("Could not find any revisions for build '%s'", build));
+            return Optional.empty();
+        }
+        
+        // Handle negative indices (Python-style: -1 = last, -2 = second-to-last, etc.)
+        if (vcsIndex < 0) {
+            vcsIndex = allRevisions.size() + vcsIndex;
+        }
+        
+        // Clamp index to valid range [0, size-1]
+        if (vcsIndex < 0) {
+            vcsIndex = 0;
+        } else if (vcsIndex >= allRevisions.size()) {
+            vcsIndex = allRevisions.size() - 1;
+        }
+        
+        BuildRevision revision = allRevisions.get(vcsIndex);
+        
+        // Check if the selected VCS is supported
+        if (!isSupportedVcs(revision)) {
+            LOG.warn(format("VCS at index %d is not supported (type: '%s') for build '%s'", 
+                vcsIndex, revision.getRoot().getVcsName(), build.getBuildId()));
             return Optional.empty();
         }
 
-        BuildRevision revision = revisionOptional.get();
         VcsRootInstanceEx vcsRootInstance = (VcsRootInstanceEx) revision.getRoot();
         VcsModificationEx vcsModification = (VcsModificationEx) vcsRootInstance.findModificationByVersion(revision.getRevision());
 

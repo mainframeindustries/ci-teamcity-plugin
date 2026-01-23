@@ -28,12 +28,14 @@ public class ProjectHandler {
     protected static final String DATADOG_ENABLED_PARAM = "datadog.ci.enabled";
     protected static final String DATADOG_ENABLE_NON_COMPOSITE_PARAM = "datadog.ci.enable.non-composite";
     protected static final String DATADOG_EMAIL_POSTFIX_PARAM = "datadog.ci.email.postfix";
+    protected static final String DATADOG_VCS_INDEX_PARAM = "datadog.ci.vcs.index";
 
     // Parameter defaults registry: If it is missing than a value is required.
     private static final Map<String, String> PARAMETER_DEFAULTS = new HashMap<String, String>() {{
         put(DATADOG_ENABLED_PARAM, "false");
         put(DATADOG_ENABLE_NON_COMPOSITE_PARAM, "false");
         put(DATADOG_EMAIL_POSTFIX_PARAM, "@teamcity");
+        put(DATADOG_VCS_INDEX_PARAM, "0");
     }};
 
     public ProjectParameters getProjectParameters(SBuild build) {
@@ -59,6 +61,16 @@ public class ProjectHandler {
 
     public String getEmailPostfix(SBuild build) {
         return getBuildParameter(build, DATADOG_EMAIL_POSTFIX_PARAM);
+    }
+
+    public int getVcsIndex(SBuild build) {
+        String vcsIndexStr = getBuildParameter(build, DATADOG_VCS_INDEX_PARAM);
+        try {
+            return Integer.parseInt(vcsIndexStr);
+        } catch (NumberFormatException e) {
+            LOG.warn(format("Invalid VCS index '%s' for build %s, defaulting to 0", vcsIndexStr, build.getBuildId()));
+            return 0;
+        }
     }
 
     /**
