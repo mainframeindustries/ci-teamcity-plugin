@@ -56,8 +56,9 @@ public class DatadogServerAdapter extends BuildServerAdapter {
             return;
         }
 
-        if (!isProcessableBuild(build)) {
-            LOG.info(format("Ignoring build with id '%s' and name '%s'", build.getBuildId(), buildName(build)));
+        String ignoreReason = getIgnoreReason(build);
+        if (ignoreReason != null) {
+            LOG.info(format("Ignoring build '%s' (id: %s): %s", buildName(build), build.getBuildId(), ignoreReason));
             return;
         }
 
@@ -72,23 +73,30 @@ public class DatadogServerAdapter extends BuildServerAdapter {
         buildChainProcessor.process(pipelineBuild);
     }
 
-    private boolean isProcessableBuild(SBuild build) {
+    /**
+     * Returns a reason why the build should be ignored, or null if it should be processed.
+     */
+    private String getIgnoreReason(SBuild build) {
         // Personal builds are never processed
         if (build.isPersonal()) {
-            return false;
+            return "personal build";
         }
 
         // Must be the final build in the chain (no dependents)
         if (build.getBuildPromotion().getNumberOfDependedOnMe() != 0) {
-            return false;
+            return "not a final build in chain (has dependents)";
         }
 
         // If it's a composite build, always process
         if (build.isCompositeBuild()) {
-            return true;
+            return null;
         }
 
         // For non-composite builds, check if the feature is enabled
-        return projectHandler.isNonCompositeEnabled(build);
+        if (projectHandler.isNonCompositeEnabled(build)) {
+            return null;
+        }
+        
+        return "non-composite build and feature not enabled";
     }
 }
