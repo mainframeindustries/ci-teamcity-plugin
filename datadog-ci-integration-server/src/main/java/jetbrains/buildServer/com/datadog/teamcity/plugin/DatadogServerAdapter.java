@@ -77,9 +77,12 @@ public class DatadogServerAdapter extends BuildServerAdapter {
      * Returns a reason why the build should be ignored, or null if it should be processed.
      */
     private String getIgnoreReason(SBuild build) {
-        // Personal builds are never processed
+        // Personal builds are only processed if explicitly enabled
         if (build.isPersonal()) {
-            return "personal build";
+            if (projectHandler.isPersonalEnabled(build)) {
+                return null;
+            }
+            return "personal build and feature not enabled";
         }
 
         // Must be the final build in the chain (no dependents)
