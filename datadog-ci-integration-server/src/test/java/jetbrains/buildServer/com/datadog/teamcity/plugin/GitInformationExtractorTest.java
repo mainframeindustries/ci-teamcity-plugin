@@ -38,12 +38,21 @@ import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.DEFAUL
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.EMPTY_AUTHOR_USERNAME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Matchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
 public class GitInformationExtractorTest {
 
-    private final GitInformationExtractor gitInfoExtractor = new GitInformationExtractor();
+    private ProjectHandler projectHandler;
+    private GitInformationExtractor gitInfoExtractor;
+
+    @Before
+    public void setUp() {
+        projectHandler = mock(ProjectHandler.class);
+        when(projectHandler.getEmailPostfix(any(SBuild.class))).thenReturn("@teamcity");
+        gitInfoExtractor = new GitInformationExtractor(projectHandler);
+    }
 
     @Test
     public void shouldReturnEmptyIfNoRevisionIsFound() {
@@ -275,6 +284,43 @@ public class GitInformationExtractorTest {
             .withCommitterEmail("johndoe@teamcity")
             .withAuthorName("John Doe")
             .withAuthorEmail("johndoe@teamcity")
+            .withBranch(DEFAULT_BRANCH)
+            .withCommitTime(toRFC3339(DEFAULT_COMMIT_DATE))
+            .withAuthorTime(toRFC3339(DEFAULT_COMMIT_DATE));
+        
+        assertThat(gitInfoOptional.get()).isEqualTo(expectedGitInfo);
+    }
+
+    @Test
+    public void shouldUseCustomEmailPostfixForPerforce() {
+        // Setup: Configure custom email postfix
+        String customEmailPostfix = "@foo.com";
+        when(projectHandler.getEmailPostfix(any(SBuild.class))).thenReturn(customEmailPostfix);
+        
+        String perforcePort = "ssl:perforce.example.com:1666";
+        String perforceStream = "//project/main";
+        String perforceVersion = "//project/main|12345";
+        String perforceCommitter = "gabe";
+        String perforceMessage = "Updated configuration";
+        
+        SBuild build = new MockBuild.Builder(1, PIPELINE)
+            .addPerforceRevision(perforcePort, perforceStream, perforceVersion, perforceCommitter, perforceMessage)
+            .build();
+
+        // When
+        Optional<GitInfo> gitInfoOptional = gitInfoExtractor.extractGitInfo(build);
+
+        // Then - should use custom email postfix
+        assertThat(gitInfoOptional).isNotEmpty();
+        GitInfo expectedGitInfo = new GitInfo()
+            .withRepositoryURL(perforcePort)
+            .withDefaultBranch(perforceStream)
+            .withSha(perforceVersion)
+            .withMessage(perforceMessage)
+            .withCommitterName(perforceCommitter)
+            .withCommitterEmail("gabe@foo.com")
+            .withAuthorName(perforceCommitter)
+            .withAuthorEmail("gabe@foo.com")
             .withBranch(DEFAULT_BRANCH)
             .withCommitTime(toRFC3339(DEFAULT_COMMIT_DATE))
             .withAuthorTime(toRFC3339(DEFAULT_COMMIT_DATE));

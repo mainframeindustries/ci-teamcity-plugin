@@ -43,6 +43,11 @@ public class GitInformationExtractor {
     ));
 
     private static final Logger LOG = Logger.getInstance(GitInformationExtractor.class.getName());
+    private final ProjectHandler projectHandler;
+
+    public GitInformationExtractor(ProjectHandler projectHandler) {
+        this.projectHandler = projectHandler;
+    }
 
     public Optional<GitInfo> extractGitInfo(SBuild build) {
         Optional<BuildRevision> revisionOptional = build.getRevisions().stream()
@@ -79,8 +84,9 @@ public class GitInformationExtractor {
 
     private GitInfo extractFromGit(VcsRootInstanceEx vcsRootInstance, VcsModificationEx vcsModification, SBuild build) {
         UsernameStyle usernameStyle = getUsernameStyleForGit(vcsRootInstance);
-        GitUserInfo committerInfo = extractCommitterInfo(vcsModification, usernameStyle);
-        GitUserInfo authorInfo = tryExtractAuthorInfo(vcsModification, usernameStyle)
+        String emailPostfix = projectHandler.getEmailPostfix(build);
+        GitUserInfo committerInfo = extractCommitterInfo(vcsModification, usernameStyle, emailPostfix);
+        GitUserInfo authorInfo = tryExtractAuthorInfo(vcsModification, usernameStyle, emailPostfix)
             .orElse(committerInfo);
 
         return new GitInfo()
@@ -100,8 +106,9 @@ public class GitInformationExtractor {
     private GitInfo extractFromPerforce(VcsRootInstanceEx vcsRootInstance, VcsModificationEx vcsModification, SBuild build) {
         // Perforce uses NAME style for username (no email formatting)
         UsernameStyle usernameStyle = UsernameStyle.NAME;
-        GitUserInfo committerInfo = extractCommitterInfo(vcsModification, usernameStyle);
-        GitUserInfo authorInfo = tryExtractAuthorInfo(vcsModification, usernameStyle)
+        String emailPostfix = projectHandler.getEmailPostfix(build);
+        GitUserInfo committerInfo = extractCommitterInfo(vcsModification, usernameStyle, emailPostfix);
+        GitUserInfo authorInfo = tryExtractAuthorInfo(vcsModification, usernameStyle, emailPostfix)
             .orElse(committerInfo);
 
         return new GitInfo()
@@ -133,22 +140,22 @@ public class GitInformationExtractor {
         return UsernameStyle.valueOf(usernameStyle);
     }
 
-    private GitUserInfo extractCommitterInfo(VcsModificationEx change, UsernameStyle usernameStyle) {
+    private GitUserInfo extractCommitterInfo(VcsModificationEx change, UsernameStyle usernameStyle, String emailPostfix) {
         String committerUsername = change.getCommiterName();
-        return parseUsername(committerUsername, usernameStyle);
+        return parseUsername(committerUsername, usernameStyle, emailPostfix);
     }
 
-    private Optional<GitUserInfo> tryExtractAuthorInfo(SVcsModification change, UsernameStyle usernameStyle) {
+    private Optional<GitUserInfo> tryExtractAuthorInfo(SVcsModification change, UsernameStyle usernameStyle, String emailPostfix) {
         String authorUsername = change.getUserName();
         if (authorUsername == null || authorUsername.isEmpty()) {
             return Optional.empty();
         }
 
-        return Optional.of(parseUsername(authorUsername, usernameStyle));
+        return Optional.of(parseUsername(authorUsername, usernameStyle, emailPostfix));
     }
 
     @Nonnull
-    private GitUserInfo parseUsername(String username, UsernameStyle usernameStyle) {
+    private GitUserInfo parseUsername(String username, UsernameStyle usernameStyle, String emailPostfix) {
         switch (usernameStyle) {
             case FULL:
                 return parseFullStyle(username);
@@ -157,7 +164,7 @@ public class GitInformationExtractor {
             case NAME:
             case USERID:
                 // These styles do not have any email information, so we will generate one
-                return parseStylesWithoutEmail(username);
+                return parseStylesWithoutEmail(username, emailPostfix);
             default:
                 throw new IllegalArgumentException("Cannot recognize username style: " + usernameStyle);
         }
@@ -191,10 +198,10 @@ public class GitInformationExtractor {
     }
 
     @Nonnull
-    private GitUserInfo parseStylesWithoutEmail(String username) {
-        // In these cases we generate an email for the user by adding @teamcity
+    private GitUserInfo parseStylesWithoutEmail(String username, String emailPostfix) {
+        // In these cases we generate an email for the user by adding the configured postfix
         String emailUsername = username.replaceAll("\\s", "").toLowerCase();
-        return new GitUserInfo(username, emailUsername + "@teamcity");
+        return new GitUserInfo(username, emailUsername + emailPostfix);
     }
 
     private String getBranch(SBuild build) {
