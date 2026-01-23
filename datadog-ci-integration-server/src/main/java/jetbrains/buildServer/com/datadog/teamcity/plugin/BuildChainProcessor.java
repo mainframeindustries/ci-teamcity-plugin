@@ -113,13 +113,30 @@ public class BuildChainProcessor {
         String pipelineID = buildID(pipelineBuild);
         List<JobWebhook> jobWebhooks = chainInfo.acceptedBuilds.stream()
             .filter(build -> !shouldBeIgnored(build))
-            .map(job -> createJobWebhook(job, pipelineName, pipelineID))
+            .map(job -> {
+                JobWebhook webhook = createJobWebhook(job, pipelineName, pipelineID);
+                // Extract and set git info for this job
+                gitInformationExtractor.extractGitInfo(job).ifPresent(webhook::setGitInfo);
+                return webhook;
+            })
             .collect(toList());
         webhooks.addAll(jobWebhooks);
 
-        // Adding git information to all webhooks
-        Optional<GitInfo> gitInfoOptional = gitInformationExtractor.extractGitInfo(pipelineBuild);
-        gitInfoOptional.ifPresent(gitInfo -> webhooks.forEach(webhook -> webhook.setGitInfo(gitInfo)));
+        // Extract git information for pipeline build
+        Optional<GitInfo> pipelineGitInfo = gitInformationExtractor.extractGitInfo(pipelineBuild);
+        
+        // If pipeline has no git info, use the first job's git info as fallback
+        if (!pipelineGitInfo.isPresent()) {
+            pipelineGitInfo = chainInfo.acceptedBuilds.stream()
+                .filter(build -> !build.isCompositeBuild()) // Composite builds don't have checkouts
+                .map(gitInformationExtractor::extractGitInfo)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findFirst();
+        }
+        
+        // Set git info on pipeline webhook
+        pipelineGitInfo.ifPresent(pipelineWebhook::setGitInfo);
 
         return webhooks;
     }
