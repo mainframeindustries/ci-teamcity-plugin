@@ -34,6 +34,8 @@ import java.util.Map;
 import static java.util.stream.Collectors.toList;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildChainProcessor.CHECKOUT_DIR_PROPERTY;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.BRANCH_PROPERTY;
+import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.PORT_PROPERTY;
+import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.STREAM_PROPERTY;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.URL_PROPERTY;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.GitInformationExtractor.USERNAME_STYLE_PROPERTY;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.DEFAULT_BRANCH;
@@ -272,6 +274,36 @@ public class MockBuild {
             when(vcsRootMock.getProperty(URL_PROPERTY)).thenReturn(DEFAULT_REPO_URL);
             when(vcsRootMock.getProperty(BRANCH_PROPERTY)).thenReturn(DEFAULT_BRANCH);
             when(vcsRootMock.getProperty(USERNAME_STYLE_PROPERTY)).thenReturn(usernameStyle);
+
+            BuildRevision revisionMock = mock(BuildRevision.class);
+            when(revisionMock.getRoot()).thenReturn(vcsRootMock);
+            when(revisionMock.getRevision()).thenReturn(DEFAULT_REVISION);
+
+            branchMock = mock(Branch.class);
+            when(branchMock.getDisplayName()).thenReturn(DEFAULT_BRANCH);
+
+            revisions.add(revisionMock);
+            return this;
+        }
+
+        public Builder addPerforceRevision(String port,
+                                           String stream,
+                                           String version,
+                                           String committerUsername,
+                                           String message) {
+            VcsModificationEx changeMock = mock(VcsModificationEx.class);
+            when(changeMock.getDescription()).thenReturn(message);
+            when(changeMock.getVersion()).thenReturn(version);
+            when(changeMock.getCommitDate()).thenReturn(DEFAULT_COMMIT_DATE);
+            when(changeMock.getVcsDate()).thenReturn(DEFAULT_COMMIT_DATE);
+            when(changeMock.getCommiterName()).thenReturn(committerUsername);
+            when(changeMock.getUserName()).thenReturn(committerUsername);
+
+            VcsRootInstanceEx vcsRootMock = mock(VcsRootInstanceEx.class);
+            when(vcsRootMock.getVcsName()).thenReturn("perforce");
+            when(vcsRootMock.findModificationByVersion(DEFAULT_REVISION)).thenReturn(changeMock);
+            when(vcsRootMock.getProperty(PORT_PROPERTY)).thenReturn(port);
+            when(vcsRootMock.getProperty(STREAM_PROPERTY)).thenReturn(stream);
 
             BuildRevision revisionMock = mock(BuildRevision.class);
             when(revisionMock.getRoot()).thenReturn(vcsRootMock);
