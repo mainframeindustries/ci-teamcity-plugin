@@ -198,6 +198,7 @@ public class DatadogServerAdapterProcessingTest {
             "1",
             IS_PARTIAL_RETRY,
             PipelineStatus.SUCCESS);
+        expectedWebhook.setTags(singletonList("trigger.type:retry"));
 
         List<Webhook> webhooksSent = webhooksCaptor.getValue();
         assertThat(webhooksSent).containsExactly(expectedWebhook);
@@ -226,6 +227,7 @@ public class DatadogServerAdapterProcessingTest {
             NO_PARTIAL_RETRY,
             PipelineStatus.SUCCESS,
             true);
+        expectedWebhook.setTags(java.util.Arrays.asList("trigger.type:user", "trigger.user:1"));
 
         List<Webhook> webhooksSent = webhooksCaptor.getValue();
         assertThat(webhooksSent).containsExactly(expectedWebhook);
