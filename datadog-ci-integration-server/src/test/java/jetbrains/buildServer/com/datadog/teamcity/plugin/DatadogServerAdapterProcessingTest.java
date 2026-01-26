@@ -656,6 +656,55 @@ public class DatadogServerAdapterProcessingTest {
 
         when(buildsManagerMock.findBuildInstanceById(2)).thenReturn(pipelineBuild);
         when(gitInfoExtractorMock.extractGitInfo(pipelineBuild)).thenReturn(Optional.of(defaultGitInfo()));
+        when(gitInfoExtractorMock.extractGitInfo(jobBuild)).thenReturn(Optional.of(defaultGitInfo()));
+
+        // When
+        datadogServerAdapter.buildFinished(pipelineBuild);
+
+        // Then
+        verify(datadogClientMock, times(1))
+            .sendWebhooksAsync(webhooksCaptor.capture(), eq(TEST_API_KEY), eq(TEST_DD_SITE), eq(20));
+
+        PipelineWebhook expectedPipelineWebhook = new PipelineWebhook(
+            DEFAULT_NAME,
+            defaultUrl(pipelineBuild),
+            toRFC3339(DEFAULT_QUEUE_DATE),
+            toRFC3339(DEFAULT_END_DATE),
+            "serverID-2",
+            "2",
+            NO_PARTIAL_RETRY,
+            PipelineStatus.SUCCESS);
+        expectedPipelineWebhook.setGitInfo(defaultGitInfo());
+
+        JobWebhook expectedJobWebhook = new JobWebhook(
+            DEFAULT_NAME,
+            defaultUrl(jobBuild),
+            toRFC3339(DEFAULT_START_DATE),
+            toRFC3339(DEFAULT_END_DATE),
+            "serverID-2",
+            DEFAULT_NAME,
+            "serverID-1",
+            JobStatus.SUCCESS,
+            DEFAULT_QUEUE_TIME);
+        expectedJobWebhook.setGitInfo(defaultGitInfo());
+
+        List<Webhook> webhooksSent = webhooksCaptor.getValue();
+        assertThat(webhooksSent).containsExactlyInAnyOrder(expectedPipelineWebhook, expectedJobWebhook);
+    }
+
+    @Test
+    public void shouldFallbackToJobGitInfoWhenPipelineHasNone() {
+        // Setup: [job -> pipeline], pipeline has no git info but job does
+        SRunningBuild jobBuild = new MockBuild.Builder(1, JOB)
+            .isTriggeredBySnapshotDependency(2)
+            .build();
+        SRunningBuild pipelineBuild = new MockBuild.Builder(2, PIPELINE)
+            .withAllDependencies(singletonList(jobBuild))
+            .build();
+
+        when(buildsManagerMock.findBuildInstanceById(2)).thenReturn(pipelineBuild);
+        when(gitInfoExtractorMock.extractGitInfo(pipelineBuild)).thenReturn(Optional.empty());
+        when(gitInfoExtractorMock.extractGitInfo(jobBuild)).thenReturn(Optional.of(defaultGitInfo()));
 
         // When
         datadogServerAdapter.buildFinished(pipelineBuild);
