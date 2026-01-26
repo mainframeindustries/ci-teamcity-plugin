@@ -9,6 +9,7 @@ package jetbrains.buildServer.com.datadog.teamcity.plugin;
 
 import com.intellij.openapi.diagnostic.Logger;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.ProjectHandler.ProjectParameters;
+import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.BuildStep;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.GitInfo;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebhook.ErrorInfo;
@@ -16,6 +17,7 @@ import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebho
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebhook.JobStatus;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.PipelineWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.PipelineWebhook.PipelineStatus;
+import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.StepWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.Webhook;
 import jetbrains.buildServer.messages.Status;
 import jetbrains.buildServer.serverSide.BuildPromotion;
@@ -25,8 +27,6 @@ import jetbrains.buildServer.serverSide.ServerSettings;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.Map;
-
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -96,7 +96,8 @@ public class BuildChainProcessor {
 
     /**
      * Creates all the webhooks for a build chain. There will be 1 pipeline webhook for the final
-     * composite build and <em>N</em> webhooks for the eligible job builds in the chain.
+     * composite build, <em>N</em> job webhooks for the eligible job builds in the chain, and
+     * <em>M</em> step webhooks for the build steps within each job.
      */
     List<Webhook> createWebhooks(SBuild pipelineBuild) {
         // First, gather all builds in the chain to get accurate timing information
@@ -110,19 +111,23 @@ public class BuildChainProcessor {
         PipelineWebhook pipelineWebhook = createPipelineWebhook(pipelineBuild, chainInfo);
         List<Webhook> webhooks = new ArrayList<>(singletonList(pipelineWebhook));
         
-        // Create job webhooks for all accepted chain members
+        // Create job webhooks and step webhooks for all accepted chain members
         String pipelineName = buildName(pipelineBuild);
         String pipelineID = buildID(pipelineBuild);
-        List<JobWebhook> jobWebhooks = chainInfo.acceptedBuilds.stream()
+        
+        chainInfo.acceptedBuilds.stream()
             .filter(build -> !shouldBeIgnored(build))
-            .map(job -> {
-                JobWebhook webhook = createJobWebhook(job, pipelineName, pipelineID);
+            .forEach(job -> {
+                // Create the job webhook
+                JobWebhook jobWebhook = createJobWebhook(job, pipelineName, pipelineID);
                 // Extract and set git info for this job
-                gitInformationExtractor.extractGitInfo(job).ifPresent(webhook::setGitInfo);
-                return webhook;
-            })
-            .collect(toList());
-        webhooks.addAll(jobWebhooks);
+                gitInformationExtractor.extractGitInfo(job).ifPresent(jobWebhook::setGitInfo);
+                webhooks.add(jobWebhook);
+                
+                // Create step webhooks for this job
+                List<StepWebhook> stepWebhooks = createStepWebhooks(job, pipelineName, pipelineID);
+                webhooks.addAll(stepWebhooks);
+            });
 
         // Extract git information for pipeline build
         Optional<GitInfo> pipelineGitInfo = gitInformationExtractor.extractGitInfo(pipelineBuild);
@@ -316,6 +321,70 @@ public class BuildChainProcessor {
             this.maxFinishTime = maxFinishTime;
         }
     }
+    
+    /**
+     * Creates step webhooks from build statistics data.
+     * Each step is sent as a separate webhook event with level: "step".
+     */
+    private List<StepWebhook> createStepWebhooks(SBuild jobBuild, String pipelineName, String pipelineID) {
+        List<BuildStep> buildSteps = extractBuildSteps(jobBuild);
+        List<StepWebhook> stepWebhooks = new ArrayList<>();
+        
+        String jobUrl = buildURL(jobBuild);
+        String jobId = buildID(jobBuild);
+        String jobName = buildName(jobBuild);
+        
+        for (int i = 0; i < buildSteps.size(); i++) {
+            BuildStep step = buildSteps.get(i);
+            
+            // Create unique ID for the step
+            String stepId = jobId + "_step_" + i;
+            
+            // Convert BuildStep.StepStatus to StepWebhook.StepStatus
+            StepWebhook.StepStatus webhookStatus = convertStepStatus(step.getStatus());
+            
+            // Create error info if step has error
+            JobWebhook.ErrorInfo errorInfo = null;
+            if (step.getError() != null) {
+                errorInfo = new JobWebhook.ErrorInfo(
+                    step.getError(), 
+                    "StepFailure", 
+                    JobWebhook.ErrorInfo.ErrorDomain.PROVIDER
+                );
+            }
+            
+            StepWebhook stepWebhook = new StepWebhook(
+                step.getName(),
+                jobUrl,  // Step URLs typically point to the job
+                step.getStart(),
+                step.getEnd(),
+                jobId,        // job_id (optional)
+                jobName,      // job_name (optional)
+                pipelineID,   // pipeline_unique_id (required)
+                pipelineName, // pipeline_name (required)
+                stepId,
+                webhookStatus,
+                errorInfo
+            );
+            
+            stepWebhooks.add(stepWebhook);
+        }
+        
+        return stepWebhooks;
+    }
+    
+    private StepWebhook.StepStatus convertStepStatus(BuildStep.StepStatus status) {
+        // Datadog only supports SUCCESS and ERROR for step-level events
+        // Map CANCELED and SKIPPED to ERROR as fallback
+        switch (status) {
+            case SUCCESS: return StepWebhook.StepStatus.SUCCESS;
+            case ERROR:
+            case CANCELED:
+            case SKIPPED:
+                return StepWebhook.StepStatus.ERROR;
+            default: throw new IllegalArgumentException("Unknown step status: " + status);
+        }
+    }
 
     private boolean shouldBeIgnored(SBuild jobBuild) {
         return jobBuild.isCompositeBuild() || // We ignore composite builds as they do not have any steps
@@ -444,6 +513,140 @@ public class BuildChainProcessor {
         }
     }
 
+    /**
+     * Extract build step information from TeamCity build statistics and configuration.
+     * Returns a list of BuildStep objects with timing and status information.
+     * Includes both user-defined build steps and TeamCity build stages (VCS checkout, artifacts publishing).
+     * 
+     * <p><b>Limitation:</b> TeamCity's public Java API (as of 2021.2) does not expose step-level status 
+     * (success/failure/error) through build statistics or SBuildRunnerDescriptor. All steps are marked 
+     * as SUCCESS regardless of actual outcome. Only step timing data is available via buildStageDuration 
+     * statistics. Build-level status is available via SBuild.getBuildStatus().</p>
+     */
+    List<BuildStep> extractBuildSteps(SBuild build) {
+        Map<String, BigDecimal> stats = build.getStatisticValues();
+        String stageDurationPrefix = "buildStageDuration:";
+        
+        // Extract all build stage durations (includes VCS, steps, artifacts, etc.)
+        Map<String, Long> stageDurations = new HashMap<>();
+        stats.entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(stageDurationPrefix))
+            .forEach(entry -> {
+                String stageId = entry.getKey().substring(stageDurationPrefix.length());
+                long durationMs = entry.getValue().longValue();
+                stageDurations.put(stageId, durationMs);
+            });
+        
+        if (stageDurations.isEmpty()) {
+            LOG.debug(format("No build stage timing data found for build '%s' (id=%s)", buildName(build), build.getBuildId()));
+            return new ArrayList<>();
+        }
+        
+        LOG.debug(format("Found %d build stages in statistics for build '%s' (id=%s)", 
+            stageDurations.size(), buildName(build), build.getBuildId()));
+        
+        // Get build configuration to map step IDs to names
+        List<jetbrains.buildServer.serverSide.SBuildRunnerDescriptor> runners = 
+            build.getBuildType().getBuildRunners();
+        Map<String, String> stepIdToName = new HashMap<>();
+        runners.forEach(runner -> stepIdToName.put(runner.getId(), runner.getName()));
+        
+        // Build steps in execution order
+        List<BuildStep> buildSteps = new ArrayList<>();
+        Date buildStart = build.getStartDate();
+        long currentOffset = 0;
+        
+        // Define the expected execution order of build stages
+        String[] stageOrder = {
+            "sourcesUpdate",           // VCS checkout
+            "toolsUpdating",           // Tool updates
+            "firstStepPreparation",    // Pre-step preparation
+            // buildStep* entries will be inserted here dynamically
+            "buildFinishing",          // Post-build cleanup
+            "artifactsPublishing"      // Artifact upload
+        };
+        
+        // Process stages in order
+        for (String stageId : stageOrder) {
+            if (stageDurations.containsKey(stageId)) {
+                long durationMs = stageDurations.remove(stageId);
+                String stepName = getStepDisplayName(stageId);
+                
+                Date stepStart = new Date(buildStart.getTime() + currentOffset);
+                Date stepEnd = new Date(stepStart.getTime() + durationMs);
+                
+                BuildStep step = new BuildStep(
+                    stepName,
+                    toRFC3339(stepStart),
+                    toRFC3339(stepEnd),
+                    durationMs,
+                    BuildStep.StepStatus.SUCCESS,
+                    null
+                );
+                
+                buildSteps.add(step);
+                LOG.debug(format("  Stage '%s' (id=%s): duration=%dms, start=%s, end=%s", 
+                    stepName, stageId, durationMs, toRFC3339(stepStart), toRFC3339(stepEnd)));
+                
+                currentOffset += durationMs;
+            }
+            
+            // After firstStepPreparation, insert actual build steps
+            if ("firstStepPreparation".equals(stageId)) {
+                List<String> buildStepIds = new ArrayList<>();
+                stageDurations.keySet().stream()
+                    .filter(key -> key.startsWith("buildStep"))
+                    .forEach(buildStepIds::add);
+                
+                // Sort build steps (they should be in order, but ensure it)
+                buildStepIds.sort(String::compareTo);
+                
+                for (String buildStepId : buildStepIds) {
+                    long durationMs = stageDurations.remove(buildStepId);
+                    String stepId = buildStepId.substring("buildStep".length());
+                    String stepName = stepIdToName.getOrDefault(stepId, stepId);
+                    
+                    Date stepStart = new Date(buildStart.getTime() + currentOffset);
+                    Date stepEnd = new Date(stepStart.getTime() + durationMs);
+                    
+                    BuildStep step = new BuildStep(
+                        stepName,
+                        toRFC3339(stepStart),
+                        toRFC3339(stepEnd),
+                        durationMs,
+                        BuildStep.StepStatus.SUCCESS,
+                        null
+                    );
+                    
+                    buildSteps.add(step);
+                    LOG.debug(format("  Step '%s' (id=%s): duration=%dms, start=%s, end=%s", 
+                        stepName, stepId, durationMs, toRFC3339(stepStart), toRFC3339(stepEnd)));
+                    
+                    currentOffset += durationMs;
+                }
+            }
+        }
+        
+        LOG.debug(format("Successfully extracted %d build steps for build '%s' (id=%s)", 
+            buildSteps.size(), buildName(build), build.getBuildId()));
+        
+        return buildSteps;
+    }
+    
+    /**
+     * Get user-friendly display name for TeamCity build stages.
+     */
+    private String getStepDisplayName(String stageId) {
+        switch (stageId) {
+            case "sourcesUpdate": return "Checkout";
+            case "toolsUpdating": return "Update Tools";
+            case "firstStepPreparation": return "Preparation";
+            case "buildFinishing": return "Finalize Build";
+            case "artifactsPublishing": return "Publish Artifacts";
+            default: return stageId;
+        }
+    }
+    
     /**
      * Log build statistics for debugging build step timing data extraction.
      */

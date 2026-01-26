@@ -65,6 +65,9 @@ public class DatadogClient {
         
         String batchDescription = getBatchDescription(webhookBatch);
 
+        // Debug logging to see what we're sending
+        LOG.debug(format("Sending webhook batch '%s': %s", batchDescription, payload));
+
         int currentAttempt = 0;
         while (currentAttempt <= retryInfo.maxRetries) {
             try {
