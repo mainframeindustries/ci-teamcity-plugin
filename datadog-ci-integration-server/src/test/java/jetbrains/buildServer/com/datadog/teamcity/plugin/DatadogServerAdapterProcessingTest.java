@@ -204,6 +204,34 @@ public class DatadogServerAdapterProcessingTest {
     }
 
     @Test
+    public void shouldDetectManualTriggers() {
+        // Setup
+        SRunningBuild pipelineBuild = new MockBuild.Builder(1, PIPELINE).isTriggeredByUser().build();
+        when(buildsManagerMock.findBuildInstanceById(1)).thenReturn(pipelineBuild);
+
+        // When
+        datadogServerAdapter.buildFinished(pipelineBuild);
+
+        // Then
+        verify(datadogClientMock, times(1))
+            .sendWebhooksAsync(webhooksCaptor.capture(), eq(TEST_API_KEY), eq(TEST_DD_SITE), eq(20));
+
+        PipelineWebhook expectedWebhook = new PipelineWebhook(
+            DEFAULT_NAME,
+            defaultUrl(pipelineBuild),
+            toRFC3339(DEFAULT_START_DATE),
+            toRFC3339(DEFAULT_END_DATE),
+            "serverID-1",
+            "1",
+            NO_PARTIAL_RETRY,
+            PipelineStatus.SUCCESS,
+            true);
+
+        List<Webhook> webhooksSent = webhooksCaptor.getValue();
+        assertThat(webhooksSent).containsExactly(expectedWebhook);
+    }
+
+    @Test
     public void shouldProcessPipelineBuildWithOneDependency() {
         // Setup: [job -> pipeline]
         SRunningBuild jobBuild = new MockBuild.Builder(1, JOB)

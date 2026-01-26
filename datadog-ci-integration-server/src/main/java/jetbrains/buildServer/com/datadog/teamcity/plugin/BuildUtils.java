@@ -24,6 +24,12 @@ public final class BuildUtils {
 
     private BuildUtils() { }
 
+    public static boolean isManualTrigger(SBuild build) {
+        // Use TeamCity's own determination of whether the build was user-triggered
+        // This includes: manual runs from UI, API calls, Perforce shelves, etc.
+        return build.getTriggeredBy().isTriggeredByUser();
+    }
+
     public static boolean isPartialRetry(SBuild pipelineBuild) {
         boolean isAutomaticRetry = pipelineBuild.getTriggeredBy()
                 .getParameters()

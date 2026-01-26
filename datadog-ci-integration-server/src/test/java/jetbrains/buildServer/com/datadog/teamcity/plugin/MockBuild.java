@@ -177,6 +177,7 @@ public class MockBuild {
             params.put("type", "user");
             params.put("userId", "1");
             when(triggeredBy.getParameters()).thenReturn(params);
+            when(triggeredBy.isTriggeredByUser()).thenReturn(true);
             return this;
         }
 
