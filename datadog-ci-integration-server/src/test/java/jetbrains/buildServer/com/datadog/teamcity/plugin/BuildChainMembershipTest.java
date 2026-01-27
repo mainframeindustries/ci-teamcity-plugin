@@ -7,6 +7,7 @@
 
 package jetbrains.buildServer.com.datadog.teamcity.plugin;
 
+import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.JobWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.PipelineWebhook;
 import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.Webhook;
 import jetbrains.buildServer.messages.Status;
@@ -242,13 +243,15 @@ public class BuildChainMembershipTest {
     @Test
     public void shouldExcludePersonalBuilds() {
         // Given: A pipeline with a personal build dependency
+        // Note: Personal build filtering happens at the top level (DatadogServerAdapter)
+        // If personal builds are allowed through, jobs should be created
         long pipelineId = 100L;
         long personalJobId = 99L;
         
         SRunningBuild personalJob = new MockBuild.Builder(personalJobId, JOB)
             .withStatus(Status.NORMAL)
             .isTriggeredBySnapshotDependency(pipelineId)
-            .isPersonal() // Personal builds should be excluded
+            .isPersonal()
             .build();
         
         SRunningBuild pipeline = new MockBuild.Builder(pipelineId, PIPELINE)
@@ -257,12 +260,13 @@ public class BuildChainMembershipTest {
             .withAllDependencies(Arrays.asList(personalJob))
             .build();
         
-        // When: Processing the pipeline
+        // When: Processing the pipeline (personal builds enabled at project level)
         List<Webhook> webhooks = buildChainProcessor.createWebhooks(pipeline);
         
-        // Then: Should only have pipeline webhook (personal job excluded)
-        assertThat(webhooks).hasSize(1);
+        // Then: Should have pipeline webhook AND job webhook (personal builds allowed)
+        assertThat(webhooks).hasSize(2);
         assertThat(webhooks.get(0)).isInstanceOf(PipelineWebhook.class);
+        assertThat(webhooks.get(1)).isInstanceOf(JobWebhook.class);
     }
 
     @Test

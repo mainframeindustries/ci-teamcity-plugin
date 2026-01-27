@@ -283,7 +283,6 @@ public class BuildChainProcessor {
 
     private boolean shouldBeIgnored(SBuild jobBuild) {
         return jobBuild.isCompositeBuild() || // We ignore composite builds as they do not have any steps
-            jobBuild.isPersonal() ||
             jobBuild.getFinishDate() == null; // This can happen in case the build is canceled before it starts
     }
 
