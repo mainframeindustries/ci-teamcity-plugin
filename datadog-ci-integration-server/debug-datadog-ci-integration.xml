@@ -1,14 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  TeamCity Logging Configuration for Datadog CI Integration Plugin
+  TeamCity Debug Logging Configuration for Datadog CI Integration Plugin
+  
+  By default, the plugin logs at INFO level to TeamCity's main server log (teamcity-server.log).
+  
+  This configuration enables DEBUG-level logging and redirects all plugin logs to a separate
+  dedicated log file for easier troubleshooting and monitoring.
   
   Usage:
-  1. Copy this file to: <TeamCity Data Directory>/config/_logging/debug-datadog-ci-integration.xml
-  2. Restart TeamCity server (or logs will auto-reload after ~30 seconds)
-  3. Plugin logs will appear in: <TeamCity Data Directory>/logs/teamcity-datadog-ci.log
-  
-  This configuration enables DEBUG-level logging for the Datadog plugin and creates
-  a dedicated log file separate from the main server logs.
+  1. Go to Administration > Diagnostics > Logging Presets tab
+     (https://teamcity.foo.bar/admin/admin.html?item=diagnostics&tab=log4j)
+  2. Upload this file using the upload form on that page
+  3. Select this file from the "Logging Presets" dropdown to activate it
+  4. Plugin logs will appear under Administration > Diagnostics > Server Logs tab
+     as "teamcity-datadog-ci.log"
 -->
 <Configuration status="INFO">
   <Appenders>
