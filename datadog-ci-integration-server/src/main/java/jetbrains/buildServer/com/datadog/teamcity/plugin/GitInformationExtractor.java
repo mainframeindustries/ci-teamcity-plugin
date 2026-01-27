@@ -12,6 +12,7 @@ import jetbrains.buildServer.com.datadog.teamcity.plugin.model.entities.GitInfo;
 import jetbrains.buildServer.serverSide.BuildRevision;
 import jetbrains.buildServer.serverSide.SBuild;
 import jetbrains.buildServer.vcs.SVcsModification;
+import jetbrains.buildServer.vcs.VcsRootInstance;
 import jetbrains.buildServer.vcs.VcsRootInstanceEx;
 import jetbrains.buildServer.vcs.impl.VcsModificationEx;
 import org.springframework.stereotype.Component;
@@ -60,6 +61,17 @@ public class GitInformationExtractor {
             return Optional.empty();
         }
         
+        LOG.debug(format("Build '%s' has %d revisions, configured vcsIndex=%d", 
+            build.getBuildId(), allRevisions.size(), vcsIndex));
+        
+        // Log all revisions for debugging
+        for (int i = 0; i < allRevisions.size(); i++) {
+            BuildRevision rev = allRevisions.get(i);
+            LOG.debug(format("  Revision[%d]: VCS='%s', VCSRootId=%d, VCSRootName='%s', revision='%s', displayName='%s'",
+                i, rev.getRoot().getVcsName(), rev.getRoot().getId(), rev.getRoot().getName(),
+                rev.getRevision(), rev.getRevisionDisplayName()));
+        }
+        
         // Handle negative indices (Python-style: -1 = last, -2 = second-to-last, etc.)
         if (vcsIndex < 0) {
             vcsIndex = allRevisions.size() + vcsIndex;
@@ -72,6 +84,8 @@ public class GitInformationExtractor {
             vcsIndex = allRevisions.size() - 1;
         }
         
+        LOG.debug(format("Selected vcsIndex=%d for build '%s'", vcsIndex, build.getBuildId()));
+        
         BuildRevision revision = allRevisions.get(vcsIndex);
         
         // Check if the selected VCS is supported
@@ -82,14 +96,18 @@ public class GitInformationExtractor {
         }
 
         VcsRootInstanceEx vcsRootInstance = (VcsRootInstanceEx) revision.getRoot();
-        VcsModificationEx vcsModification = (VcsModificationEx) vcsRootInstance.findModificationByVersion(revision.getRevision());
+        String vcsType = vcsRootInstance.getVcsName();
+        String revisionString = revision.getRevision();
+        
+        // Try to find the VCS modification
+        VcsModificationEx vcsModification = (VcsModificationEx) vcsRootInstance.findModificationByVersion(revisionString);
 
         if (vcsModification == null) {
-            LOG.warn(format("Could not find modification for revision '%s' from VCS root '%s'", revision, vcsRootInstance));
+            LOG.warn(format("Could not find VCS modification for build '%s', vcsIndex: %d, VCS type: '%s', revision: '%s'",
+                build.getBuildId(), vcsIndex, vcsType, revisionString));
             return Optional.empty();
         }
 
-        String vcsType = vcsRootInstance.getVcsName();
         GitInfo gitInfo;
         
         if (GIT_VCS.equalsIgnoreCase(vcsType)) {
