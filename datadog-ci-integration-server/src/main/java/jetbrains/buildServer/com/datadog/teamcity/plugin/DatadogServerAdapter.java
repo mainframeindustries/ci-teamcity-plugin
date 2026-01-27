@@ -17,6 +17,7 @@ import jetbrains.buildServer.util.EventDispatcher;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Nonnull;
+import java.util.Map;
 
 import static java.lang.String.format;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.buildName;
@@ -82,6 +83,11 @@ public class DatadogServerAdapter extends BuildServerAdapter {
             return "personal build and feature not enabled";
         }
 
+        // Builds triggered by snapshot dependency should be processed as part of the parent chain
+        if (isTriggeredBySnapshotDependency(build)) {
+            return "triggered by snapshot dependency (will be processed as part of parent chain)";
+        }
+
         // Must be the final build in the chain (no dependents)
         if (build.getBuildPromotion().getNumberOfDependedOnMe() != 0) {
             return "not a final build in chain (has dependents)";
@@ -93,5 +99,19 @@ public class DatadogServerAdapter extends BuildServerAdapter {
         }
 
         return null;
+    }
+
+    /**
+     * Check if this build was triggered by a snapshot dependency.
+     * If so, it should be processed as part of the parent chain, not as a standalone pipeline.
+     */
+    private boolean isTriggeredBySnapshotDependency(SBuild build) {
+        jetbrains.buildServer.serverSide.TriggeredBy triggeredBy = build.getTriggeredBy();
+        if (triggeredBy == null) {
+            return false;
+        }
+        
+        Map<String, String> params = triggeredBy.getParameters();
+        return params.containsKey("type") && "snapshotDependency".equals(params.get("type"));
     }
 }
