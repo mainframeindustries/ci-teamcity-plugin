@@ -27,11 +27,13 @@ public class ProjectHandler {
     protected static final String DATADOG_SITE_PARAM = "datadog.ci.site";
     protected static final String DATADOG_ENABLED_PARAM = "datadog.ci.enabled";
     protected static final String DATADOG_BATCH_SIZE_PARAM = "datadog.ci.batch.size";
-    
+    protected static final String DATADOG_ENABLE_NON_COMPOSITE_PARAM = "datadog.ci.enable.non-composite";
+
     // Parameter defaults registry: If it is missing than a value is required.
     private static final Map<String, String> PARAMETER_DEFAULTS = new HashMap<String, String>() {{
         put(DATADOG_ENABLED_PARAM, "false");
         put(DATADOG_BATCH_SIZE_PARAM, "20");
+        put(DATADOG_ENABLE_NON_COMPOSITE_PARAM, "false");
     }};
 
     public ProjectParameters getProjectParameters(SBuild build) {
@@ -51,6 +53,10 @@ public class ProjectHandler {
         return isPluginEnabled;
     }
 
+    public boolean isNonCompositeEnabled(SBuild build) {
+        String enabled = getBuildParameter(build, DATADOG_ENABLE_NON_COMPOSITE_PARAM);
+        return Boolean.parseBoolean(enabled);
+    }
 
     /**
      * Get a parameter value from the build. If the parameter is not set:
