@@ -152,7 +152,7 @@ public class GitInformationExtractor {
             .orElse(committerInfo);
 
         return new GitInfo()
-            .withRepositoryURL(vcsRootInstance.getProperty(PORT_PROPERTY))
+            .withRepositoryURL(convertP4PortToUrl(vcsRootInstance.getProperty(PORT_PROPERTY)))
             .withDefaultBranch(vcsRootInstance.getProperty(STREAM_PROPERTY))
             .withMessage(vcsModification.getDescription().trim())
             .withSha(vcsModification.getVersion())
@@ -255,6 +255,26 @@ public class GitInformationExtractor {
         private GitUserInfo(String username, String email) {
             this.username = username;
             this.email = email;
+        }
+    }
+
+    /**
+     * Converts Perforce P4PORT format to a proper URL scheme.
+     * Examples:
+     *   ssl:perforce.example.com:1666 -> https://perforce.example.com:1666
+     *   perforce.example.com:1666 -> http://perforce.example.com:1666
+     */
+    protected String convertP4PortToUrl(String p4Port) {
+        if (p4Port == null) {
+            return null;
+        }
+        if (p4Port.startsWith("ssl:")) {
+            return "https://" + p4Port.substring(4);
+        } else if (p4Port.startsWith("tcp:")) {
+            return "http://" + p4Port.substring(4);
+        } else {
+            // Assume plain connection if no prefix
+            return "http://" + p4Port;
         }
     }
 

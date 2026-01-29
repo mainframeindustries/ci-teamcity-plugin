@@ -243,7 +243,7 @@ public class GitInformationExtractorTest {
         // Then
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666")
             .withDefaultBranch(perforceStream)
             .withSha(perforceVersion)
             .withMessage(perforceMessage)
@@ -277,7 +277,7 @@ public class GitInformationExtractorTest {
         // Then
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666")
             .withDefaultBranch(perforceStream)
             .withSha(perforceVersion)
             .withMessage(perforceMessage)
@@ -314,7 +314,7 @@ public class GitInformationExtractorTest {
         // Then - should use custom email postfix
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666")
             .withDefaultBranch(perforceStream)
             .withSha(perforceVersion)
             .withMessage(perforceMessage)
@@ -376,7 +376,7 @@ public class GitInformationExtractorTest {
         // Then - should use VCS at index 1 (Perforce)
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666")
             .withDefaultBranch(perforceStream)
             .withSha(perforceVersion)
             .withMessage(perforceMessage)
@@ -414,7 +414,7 @@ public class GitInformationExtractorTest {
         // Then - should use last VCS (Perforce)
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666")
             .withDefaultBranch(perforceStream)
             .withSha(perforceVersion)
             .withMessage(perforceMessage)
@@ -452,7 +452,7 @@ public class GitInformationExtractorTest {
         // Then - should use last valid index (1 = Perforce)
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666")
             .withDefaultBranch(perforceStream)
             .withSha(perforceVersion)
             .withMessage(perforceMessage)
