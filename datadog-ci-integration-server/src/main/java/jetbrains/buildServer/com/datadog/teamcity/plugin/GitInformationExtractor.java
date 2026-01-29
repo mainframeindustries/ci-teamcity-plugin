@@ -151,11 +151,12 @@ public class GitInformationExtractor {
         GitUserInfo authorInfo = tryExtractAuthorInfo(vcsModification, usernameStyle, emailPostfix)
             .orElse(committerInfo);
 
+        String stream = vcsRootInstance.getProperty(STREAM_PROPERTY);
         return new GitInfo()
-            .withRepositoryURL(vcsRootInstance.getProperty(PORT_PROPERTY))
-            .withDefaultBranch(vcsRootInstance.getProperty(STREAM_PROPERTY))
+            .withRepositoryURL(convertP4PortToUrl(vcsRootInstance.getProperty(PORT_PROPERTY), stream))
+            .withDefaultBranch(stream)
             .withMessage(vcsModification.getDescription().trim())
-            .withSha(vcsModification.getVersion())
+            .withSha(convertPerforceVersionToSha(vcsModification.getVersion()))
             .withCommitTime(toRFC3339(vcsModification.getVcsDate()))
             .withCommitterName(committerInfo.username)
             .withCommitterEmail(committerInfo.email)
@@ -256,6 +257,52 @@ public class GitInformationExtractor {
             this.username = username;
             this.email = email;
         }
+    }
+
+    /**
+     * Converts Perforce P4PORT format to a proper URL scheme.
+     * Examples:
+     *   ssl:perforce.example.com:1666 -> https://perforce.example.com:1666/depot.git
+     *   perforce.example.com:1666 -> http://perforce.example.com:1666/depot.git
+     */
+    protected String convertP4PortToUrl(String p4Port, String stream) {
+        if (p4Port == null) {
+            return null;
+        }
+        
+        // Use full stream path (e.g., //foo/bar -> /foo/bar.git)
+        String repoPath = "depot.git";
+        if (stream != null && stream.startsWith("//")) {
+            repoPath = stream.substring(1) + ".git";  // Remove leading / from //
+        }
+        
+        if (p4Port.startsWith("ssl:")) {
+            return "https://" + p4Port.substring(4) + repoPath;
+        } else if (p4Port.startsWith("tcp:")) {
+            return "http://" + p4Port.substring(4) + repoPath;
+        } else {
+            // Assume plain connection if no prefix
+            return "http://" + p4Port + repoPath;
+        }
+    }
+
+    /**
+     * Converts Perforce version to a Git-compatible SHA-1 hash.
+     * Extracts the changelist number from Perforce version (e.g., //project/main|12345)
+     * and pads it with leading zeros to create a 40-character SHA (decimal digits are valid hex).
+     */
+    protected String convertPerforceVersionToSha(String perforceVersion) {
+        if (perforceVersion == null) {
+            return null;
+        }
+        // Extract changelist number after the pipe character
+        int pipeIndex = perforceVersion.lastIndexOf('|');
+        String changelist = (pipeIndex >= 0 && pipeIndex < perforceVersion.length() - 1) 
+            ? perforceVersion.substring(pipeIndex + 1)
+            : perforceVersion;
+        
+        // Pad with leading zeros to make a 40-character SHA
+        return String.format("%040d", Long.parseLong(changelist));
     }
 
     protected enum UsernameStyle {

@@ -243,9 +243,9 @@ public class GitInformationExtractorTest {
         // Then
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666/project/main.git")
             .withDefaultBranch(perforceStream)
-            .withSha(perforceVersion)
+            .withSha("0000000000000000000000000000000000012345")
             .withMessage(perforceMessage)
             .withCommitterName(perforceCommitter)
             .withCommitterEmail("build@teamcity")
@@ -277,9 +277,9 @@ public class GitInformationExtractorTest {
         // Then
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666/project/main.git")
             .withDefaultBranch(perforceStream)
-            .withSha(perforceVersion)
+            .withSha("0000000000000000000000000000000000067890")
             .withMessage(perforceMessage)
             .withCommitterName("John Doe")
             .withCommitterEmail("johndoe@teamcity")
@@ -314,9 +314,9 @@ public class GitInformationExtractorTest {
         // Then - should use custom email postfix
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666/project/main.git")
             .withDefaultBranch(perforceStream)
-            .withSha(perforceVersion)
+            .withSha("0000000000000000000000000000000000012345")
             .withMessage(perforceMessage)
             .withCommitterName(perforceCommitter)
             .withCommitterEmail("gabe@foo.com")
@@ -376,9 +376,9 @@ public class GitInformationExtractorTest {
         // Then - should use VCS at index 1 (Perforce)
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666/project/main.git")
             .withDefaultBranch(perforceStream)
-            .withSha(perforceVersion)
+            .withSha("0000000000000000000000000000000000012345")
             .withMessage(perforceMessage)
             .withCommitterName(perforceCommitter)
             .withCommitterEmail("p4-user@teamcity")
@@ -414,9 +414,9 @@ public class GitInformationExtractorTest {
         // Then - should use last VCS (Perforce)
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666/project/main.git")
             .withDefaultBranch(perforceStream)
-            .withSha(perforceVersion)
+            .withSha("0000000000000000000000000000000000012345")
             .withMessage(perforceMessage)
             .withCommitterName(perforceCommitter)
             .withCommitterEmail("p4-user@teamcity")
@@ -452,9 +452,9 @@ public class GitInformationExtractorTest {
         // Then - should use last valid index (1 = Perforce)
         assertThat(gitInfoOptional).isNotEmpty();
         GitInfo expectedGitInfo = new GitInfo()
-            .withRepositoryURL(perforcePort)
+            .withRepositoryURL("https://perforce.example.com:1666/project/main.git")
             .withDefaultBranch(perforceStream)
-            .withSha(perforceVersion)
+            .withSha("0000000000000000000000000000000000012345")
             .withMessage(perforceMessage)
             .withCommitterName(perforceCommitter)
             .withCommitterEmail("p4-user@teamcity")
