@@ -92,7 +92,7 @@ public class BuildChainProcessor {
         ProjectParameters params = projectHandler.getProjectParameters(pipelineBuild);
         List<Webhook> webhooks = createWebhooks(pipelineBuild);
 
-        datadogClient.sendWebhooksAsync(webhooks, params.apiKey(), params.ddSite(), params.batchSize());
+        datadogClient.sendWebhooksAsync(webhooks, params);
     }
 
     /**

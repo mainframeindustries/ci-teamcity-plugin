@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import static java.lang.String.format;
+import static jetbrains.buildServer.com.datadog.teamcity.plugin.ProjectHandler.ProjectParameters;
 
 public class DatadogClient {
 
@@ -48,20 +49,20 @@ public class DatadogClient {
     }
 
     @VisibleForTesting
-    protected void sendWebhooksAsync(List<Webhook> webhooks, String apiKey, String ddSite, int batchSize) {
+    protected void sendWebhooksAsync(List<Webhook> webhooks, ProjectParameters config) {
         // Split webhooks into batches and send each batch asynchronously
-        for (int i = 0; i < webhooks.size(); i += batchSize) {
-            int end = Math.min(i + batchSize, webhooks.size());
+        for (int i = 0; i < webhooks.size(); i += config.batchSize()) {
+            int end = Math.min(i + config.batchSize(), webhooks.size());
             List<Webhook> batch = webhooks.subList(i, end);
-            clientExecutor.submit(() -> sendWebhookBatchWithRetries(batch, apiKey, ddSite));
+            clientExecutor.submit(() -> sendWebhookBatchWithRetries(batch, config));
         }
     }
 
     @VisibleForTesting
-    protected boolean sendWebhookBatchWithRetries(List<Webhook> webhookBatch, String apiKey, String ddSite) {
-        String url = format(WEBHOOK_INTAKE_BASE_URL, ddSite);
+    protected boolean sendWebhookBatchWithRetries(List<Webhook> webhookBatch, ProjectParameters config) {
+        String url = format(WEBHOOK_INTAKE_BASE_URL, config.ddSite());
         String payload = serializeBatch(webhookBatch);
-        HttpEntity<String> request = new HttpEntity<>(payload, getHeaders(apiKey));
+        HttpEntity<String> request = new HttpEntity<>(payload, getHeaders(config.apiKey()));
         
         String batchDescription = getBatchDescription(webhookBatch);
 
