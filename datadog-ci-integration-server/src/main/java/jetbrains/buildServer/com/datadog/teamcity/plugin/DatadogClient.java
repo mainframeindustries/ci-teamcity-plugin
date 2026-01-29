@@ -20,6 +20,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import jetbrains.buildServer.com.datadog.teamcity.plugin.model.api.CIAppPipelineEventRequest;
+
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -31,10 +33,9 @@ public class DatadogClient {
 
     private static final Logger LOG = Logger.getInstance(DatadogClient.class.getName());
     private static final String TEAMCITY_PROVIDER = "teamcity";
-    private static final String WEBHOOK_INTAKE_BASE_URL = "https://webhook-intake.%s/api/v2/webhook";
+    private static final String CI_PIPELINE_URL = "https://api.%s/api/v2/ci/pipeline";
 
     protected static final String DD_API_KEY_HEADER = "DD-API-KEY";
-    protected static final String DD_CI_PROVIDER_HEADER = "DD-CI-PROVIDER-NAME";
 
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
@@ -60,8 +61,8 @@ public class DatadogClient {
 
     @VisibleForTesting
     protected boolean sendWebhookBatchWithRetries(List<Webhook> webhookBatch, ProjectParameters config) {
-        String url = format(WEBHOOK_INTAKE_BASE_URL, config.ddSite());
-        String payload = serializeBatch(webhookBatch);
+        String url = format(CI_PIPELINE_URL, config.ddSite());
+        String payload = serializeBatch(webhookBatch, config.serverUUID());
         HttpEntity<String> request = new HttpEntity<>(payload, getHeaders(config.apiKey()));
         
         String batchDescription = getBatchDescription(webhookBatch);
@@ -111,14 +112,14 @@ public class DatadogClient {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.add(DD_API_KEY_HEADER, apiKey);
-        headers.add(DD_CI_PROVIDER_HEADER, TEAMCITY_PROVIDER);
         return headers;
     }
 
-    private String serializeBatch(List<Webhook> webhookBatch) {
+    private String serializeBatch(List<Webhook> webhookBatch, String serverUUID) {
         try {
-            // Always serialize as array - Datadog API accepts both single objects and arrays
-            return objectMapper.writeValueAsString(webhookBatch);
+            CIAppPipelineEventRequest request = CIAppPipelineEventRequest.fromWebhooks(
+                webhookBatch, TEAMCITY_PROVIDER, serverUUID, null);
+            return objectMapper.writeValueAsString(request);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(format("Could not serialize the webhook batch: %s", webhookBatch), e);
         }

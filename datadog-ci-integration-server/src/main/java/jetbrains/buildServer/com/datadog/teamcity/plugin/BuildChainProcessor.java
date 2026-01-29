@@ -89,7 +89,7 @@ public class BuildChainProcessor {
         logTriggeredByInfo(pipelineBuild, "PIPELINE");
         logBuildStatistics(pipelineBuild);
         
-        ProjectParameters params = projectHandler.getProjectParameters(pipelineBuild);
+        ProjectParameters params = projectHandler.getProjectParameters(pipelineBuild, serverSettings.getServerUUID());
         List<Webhook> webhooks = createWebhooks(pipelineBuild);
 
         datadogClient.sendWebhooksAsync(webhooks, params);

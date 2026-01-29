@@ -45,7 +45,6 @@ import java.util.concurrent.Executors;
 import static java.util.Collections.singletonList;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.BuildUtils.toRFC3339;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.DatadogClient.DD_API_KEY_HEADER;
-import static jetbrains.buildServer.com.datadog.teamcity.plugin.DatadogClient.DD_CI_PROVIDER_HEADER;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.DEFAULT_BUILD_URL;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.DEFAULT_END_DATE;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.DEFAULT_ID;
@@ -57,6 +56,7 @@ import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.DEFAUL
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.NO_PARTIAL_RETRY;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.TEST_API_KEY;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.TEST_DD_SITE;
+import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.TEST_SERVER_UUID;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.defaultErrorInfo;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.defaultGitInfo;
 import static jetbrains.buildServer.com.datadog.teamcity.plugin.TestUtils.defaultHostInfo;
@@ -78,7 +78,7 @@ public class DatadogClientTest {
 
     private static final RetryInformation RETRY_INFO = new RetryInformation(2, 0);
     private static final int TEST_TIMEOUT_MS = 30_000;
-    private static final String TEST_WEBHOOK_INTAKE = "https://webhook-intake.datad0g.com/api/v2/webhook";
+    private static final String TEST_WEBHOOK_INTAKE = "https://api.datad0g.com/api/v2/ci/pipeline";
 
     @Captor
     private ArgumentCaptor<HttpEntity<String>> requestCaptor;
@@ -156,11 +156,11 @@ public class DatadogClientTest {
         List<HttpEntity<String>> requests = requestCaptor.getAllValues();
         assertThat(requests).hasSize(2);
         
-        // Count webhooks in each batch by counting array elements
+        // Count webhooks in each batch - body should be valid JSON objects wrapped in API request
         for (HttpEntity<String> request : requests) {
             String body = request.getBody();
-            // Simple check: body should start with '[' and end with ']'
-            assertThat(body.trim()).startsWith("[").endsWith("]");
+            // Simple check: body should start with '{' and end with '}'
+            assertThat(body.trim()).startsWith("{").endsWith("}");
         }
     }
 
@@ -181,10 +181,9 @@ public class DatadogClientTest {
 
         HttpEntity<String> requestDone = requestCaptor.getValue();
         assertThat(requestDone.getHeaders().toSingleValueMap())
-            .hasSize(3)
+            .hasSize(2)
             .containsEntry("Content-Type", MediaType.APPLICATION_JSON.toString())
-            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY)
-            .containsEntry(DD_CI_PROVIDER_HEADER, "teamcity");
+            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY);
 
         String expectedJson = loadJson("default-pipeline.json");
         String body = requestCaptor.getValue().getBody();
@@ -209,10 +208,9 @@ public class DatadogClientTest {
 
         HttpEntity<String> requestDone = requestCaptor.getValue();
         assertThat(requestDone.getHeaders().toSingleValueMap())
-            .hasSize(3)
+            .hasSize(2)
             .containsEntry("Content-Type", MediaType.APPLICATION_JSON.toString())
-            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY)
-            .containsEntry(DD_CI_PROVIDER_HEADER, "teamcity");
+            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY);
 
         String expectedJson = loadJson("default-pipeline.json");
         String body = requestCaptor.getValue().getBody();
@@ -237,10 +235,9 @@ public class DatadogClientTest {
 
         HttpEntity<String> requestDone = requestCaptor.getValue();
         assertThat(requestDone.getHeaders().toSingleValueMap())
-            .hasSize(3)
+            .hasSize(2)
             .containsEntry("Content-Type", MediaType.APPLICATION_JSON.toString())
-            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY)
-            .containsEntry(DD_CI_PROVIDER_HEADER, "teamcity");
+            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY);
 
         String expectedJson = loadJson("default-pipeline.json");
         String body = requestCaptor.getValue().getBody();
@@ -298,10 +295,9 @@ public class DatadogClientTest {
 
         HttpEntity<String> requestDone = requestCaptor.getValue();
         assertThat(requestDone.getHeaders().toSingleValueMap())
-            .hasSize(3)
+            .hasSize(2)
             .containsEntry("Content-Type", MediaType.APPLICATION_JSON.toString())
-            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY)
-            .containsEntry(DD_CI_PROVIDER_HEADER, "teamcity");
+            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY);
 
         String expectedJson = loadJson("complete-pipeline.json");
         String body = requestCaptor.getValue().getBody();
@@ -325,10 +321,9 @@ public class DatadogClientTest {
 
         HttpEntity<String> requestDone = requestCaptor.getValue();
         assertThat(requestDone.getHeaders().toSingleValueMap())
-            .hasSize(3)
+            .hasSize(2)
             .containsEntry("Content-Type", MediaType.APPLICATION_JSON.toString())
-            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY)
-            .containsEntry(DD_CI_PROVIDER_HEADER, "teamcity");
+            .containsEntry(DD_API_KEY_HEADER, TEST_API_KEY);
 
         String expectedJson = loadJson("complete-job.json");
         String body = requestCaptor.getValue().getBody();
@@ -387,10 +382,10 @@ public class DatadogClientTest {
     }
 
     private static ProjectParameters defaultProjectParams() {
-        return new ProjectParameters(TEST_API_KEY, TEST_DD_SITE, 20);
+        return new ProjectParameters(TEST_API_KEY, TEST_DD_SITE, 20, TEST_SERVER_UUID);
     }
 
     private static ProjectParameters projectParamsWithBatchSize(int batchSize) {
-        return new ProjectParameters(TEST_API_KEY, TEST_DD_SITE, batchSize);
+        return new ProjectParameters(TEST_API_KEY, TEST_DD_SITE, batchSize, TEST_SERVER_UUID);
     }
 }

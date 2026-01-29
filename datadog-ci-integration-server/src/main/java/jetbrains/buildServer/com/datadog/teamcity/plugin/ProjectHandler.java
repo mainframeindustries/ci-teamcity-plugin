@@ -42,11 +42,11 @@ public class ProjectHandler {
         put(DATADOG_VCS_INDEX_PARAM, "0");
     }};
 
-    public ProjectParameters getProjectParameters(SBuild build) {
+    public ProjectParameters getProjectParameters(SBuild build, String serverUUID) {
         String apiKey = getBuildParameter(build, DATADOG_API_KEY_PARAM);
         String ddSite = getBuildParameter(build, DATADOG_SITE_PARAM);
         int batchSize = getBatchSize(build);
-        return new ProjectParameters(apiKey, ddSite, batchSize);
+        return new ProjectParameters(apiKey, ddSite, batchSize, serverUUID);
     }
 
     public boolean isPluginEnabled(SBuild build) {
@@ -144,11 +144,13 @@ public class ProjectHandler {
         private final String apiKey;
         private final String ddSite;
         private final int batchSize;
+        private final String serverUUID;
 
-        public ProjectParameters(String apiKey, String ddSite, int batchSize) {
+        public ProjectParameters(String apiKey, String ddSite, int batchSize, String serverUUID) {
             this.apiKey = apiKey;
             this.ddSite = ddSite;
             this.batchSize = batchSize;
+            this.serverUUID = serverUUID;
         }
 
         public String apiKey() {
@@ -163,6 +165,10 @@ public class ProjectHandler {
             return batchSize;
         }
 
+        public String serverUUID() {
+            return serverUUID;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -170,12 +176,13 @@ public class ProjectHandler {
             ProjectParameters that = (ProjectParameters) o;
             return batchSize == that.batchSize &&
                    java.util.Objects.equals(apiKey, that.apiKey) &&
-                   java.util.Objects.equals(ddSite, that.ddSite);
+                   java.util.Objects.equals(ddSite, that.ddSite) &&
+                   java.util.Objects.equals(serverUUID, that.serverUUID);
         }
 
         @Override
         public int hashCode() {
-            return java.util.Objects.hash(apiKey, ddSite, batchSize);
+            return java.util.Objects.hash(apiKey, ddSite, batchSize, serverUUID);
         }
     }
 }
