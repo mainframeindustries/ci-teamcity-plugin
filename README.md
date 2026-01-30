@@ -19,7 +19,8 @@ This fork includes the following enhancements over the official plugin:
 - **Trigger Information Tags**: Extract and report trigger information as pipeline tags
 - **Non-Composite Build Support**: Allow build chains that are not terminated by a composite build (removes requirement for composite build at top of chain)
 - **Personal Build Support**: Option to enable CI visibility for personal builds
-- **Perforce Support**: Enhanced support for Perforce repositories in addition to Git ⚠️ **Note**: While the plugin extracts and sends git information from Perforce repositories, Datadog's CI Visibility API currently does not accept Perforce-style git data (URLs like `ssl:perforce...`, revision formats like `main|166874`, and depot paths like `//depot/main`). Git repositories are fully supported.
+- **Perforce Support**: Support for Perforce repositories by converting them to Git-compatible format for Datadog CI Visibility (P4PORT URLs converted to https://, changelists treated as commit SHAs)
+- **SSH Git URL Conversion**: Automatically converts SSH-style Git URLs (e.g., `git@github.com:owner/repo.git`) to HTTPS format for proper ingestion by Datadog
 - **Custom Email Postfix**: Configurable email domain suffix for user attribution
 - **VCS Entry Selection**: Select which VCS root to use when multiple are present
 - **Job-Level Parameter Overrides**: Override configuration parameters at the job level
