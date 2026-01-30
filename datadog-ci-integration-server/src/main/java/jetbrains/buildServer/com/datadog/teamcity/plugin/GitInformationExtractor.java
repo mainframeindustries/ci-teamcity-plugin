@@ -86,25 +86,61 @@ public class GitInformationExtractor {
         
         LOG.debug(format("Selected vcsIndex=%d for build '%s'", vcsIndex, build.getBuildId()));
         
+        // Try the configured VCS index first, then fallback to trying all in order
         BuildRevision revision = allRevisions.get(vcsIndex);
-        
+        VcsModificationEx vcsModification = null;
+        VcsRootInstanceEx vcsRootInstance = null;
+        String vcsType = null;
+
         // Check if the selected VCS is supported
-        if (!isSupportedVcs(revision)) {
-            LOG.warn(format("VCS at index %d is not supported (type: '%s') for build '%s'", 
-                vcsIndex, revision.getRoot().getVcsName(), build.getBuildId()));
-            return Optional.empty();
+        if (isSupportedVcs(revision)) {
+            vcsRootInstance = (VcsRootInstanceEx) revision.getRoot();
+            vcsType = vcsRootInstance.getVcsName();
+            String revisionString = revision.getRevision();
+            
+            // Try to find the VCS modification
+            vcsModification = (VcsModificationEx) vcsRootInstance.findModificationByVersion(revisionString);
+            
+            if (vcsModification == null) {
+                LOG.warn(format("Could not find VCS modification for build '%s', vcsIndex: %d, VCS type: '%s', revision: '%s'",
+                    build.getBuildId(), vcsIndex, vcsType, revisionString));
+            }
         }
-
-        VcsRootInstanceEx vcsRootInstance = (VcsRootInstanceEx) revision.getRoot();
-        String vcsType = vcsRootInstance.getVcsName();
-        String revisionString = revision.getRevision();
         
-        // Try to find the VCS modification
-        VcsModificationEx vcsModification = (VcsModificationEx) vcsRootInstance.findModificationByVersion(revisionString);
-
+        // Fallback: if modification not found and there are multiple VCS entries, try them all
+        if (vcsModification == null && allRevisions.size() > 1) {
+            LOG.debug(format("Attempting fallback: trying all VCS entries for build '%s'", build.getBuildId()));
+            
+            for (int i = 0; i < allRevisions.size(); i++) {
+                if (i == vcsIndex) {
+                    continue; // Already tried this one
+                }
+                
+                BuildRevision fallbackRevision = allRevisions.get(i);
+                if (!isSupportedVcs(fallbackRevision)) {
+                    continue;
+                }
+                
+                VcsRootInstanceEx fallbackVcsRoot = (VcsRootInstanceEx) fallbackRevision.getRoot();
+                String fallbackVcsType = fallbackVcsRoot.getVcsName();
+                String fallbackRevisionString = fallbackRevision.getRevision();
+                
+                VcsModificationEx fallbackModification = (VcsModificationEx) fallbackVcsRoot.findModificationByVersion(fallbackRevisionString);
+                
+                if (fallbackModification != null) {
+                    LOG.info(format("Fallback successful: using VCS index %d (type: '%s', revision: '%s') for build '%s'",
+                        i, fallbackVcsType, fallbackRevisionString, build.getBuildId()));
+                    vcsModification = fallbackModification;
+                    vcsRootInstance = fallbackVcsRoot;
+                    vcsType = fallbackVcsType;
+                    break;
+                }
+            }
+        }
+        
         if (vcsModification == null) {
-            LOG.warn(format("Could not find VCS modification for build '%s', vcsIndex: %d, VCS type: '%s', revision: '%s'",
-                build.getBuildId(), vcsIndex, vcsType, revisionString));
+            LOG.warn(format("Could not find any VCS modification for build '%s' after trying all %d revisions",
+                build.getBuildId(), allRevisions.size()));
             return Optional.empty();
         }
 
