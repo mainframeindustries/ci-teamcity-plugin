@@ -361,8 +361,10 @@ public class GitInformationExtractor {
             ? perforceVersion.substring(pipeIndex + 1)
             : perforceVersion;
         
-        // Pad with leading zeros to make a 40-character SHA
-        return String.format("%040d", Long.parseLong(changelist));
+        // Format as changelist + f + zeros, truncated to 40 chars
+        // f serves as demarcation between changelist and padding
+        // This places the changelist into the initial "short" part of the SHA
+        return (changelist + "f" + "00000000000000000000000000000000000000").substring(0, 40);
     }
 
     protected enum UsernameStyle {
