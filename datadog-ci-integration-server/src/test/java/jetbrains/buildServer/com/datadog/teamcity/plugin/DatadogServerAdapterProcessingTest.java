@@ -168,7 +168,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(pipelineBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-1",
+            "1",
             "1",
             NO_PARTIAL_RETRY,
             PipelineStatus.SUCCESS);
@@ -195,7 +195,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(pipelineBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-1",
+            "1",
             "1",
             IS_PARTIAL_RETRY,
             PipelineStatus.SUCCESS);
@@ -223,7 +223,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(pipelineBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-1",
+            "1",
             "1",
             NO_PARTIAL_RETRY,
             PipelineStatus.SUCCESS,
@@ -259,7 +259,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(DEFAULT_QUEUE_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 "2",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -268,9 +268,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(jobBuild),
                 toRFC3339(DEFAULT_START_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 DEFAULT_NAME,
-                "serverID-1",
+                "1",
                 JobStatus.SUCCESS,
                 DEFAULT_QUEUE_TIME));
 
@@ -306,12 +306,12 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(secondJobBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-3",
+            "3",
             DEFAULT_NAME,
-            "serverID-2",
+            "2",
             JobStatus.SUCCESS,
             DEFAULT_QUEUE_TIME);
-        secondJobWebhook.setDependenciesIds(singletonList("serverID-1"));
+        secondJobWebhook.setDependenciesIds(singletonList("1"));
 
         List<Webhook> expectedWebhooks = Arrays.asList(
             new PipelineWebhook(
@@ -319,7 +319,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(DEFAULT_QUEUE_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-3",
+                "3",
                 "3",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -328,9 +328,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(firstJobBuild),
                 toRFC3339(DEFAULT_START_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-3",
+                "3",
                 DEFAULT_NAME,
-                "serverID-1",
+                "1",
                 JobStatus.SUCCESS,
                 DEFAULT_QUEUE_TIME),
             secondJobWebhook);
@@ -374,12 +374,12 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(secondJobBuild),
             toRFC3339(pipelineStart),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-3",
+            "3",
             DEFAULT_NAME,
-            "serverID-2",
+            "2",
             JobStatus.SUCCESS,
             0);
-        secondJobWebhook.setDependenciesIds(singletonList("serverID-1"));
+        secondJobWebhook.setDependenciesIds(singletonList("1"));
 
         List<Webhook> expectedWebhooks = Arrays.asList(
             new PipelineWebhook(
@@ -387,7 +387,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(pipelineStart),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-3",
+                "3",
                 "3",
                 IS_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -427,7 +427,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(DEFAULT_QUEUE_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-3",
+                "3",
                 "3",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -436,9 +436,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(firstJobBuild),
                 toRFC3339(DEFAULT_START_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-3",
+                "3",
                 DEFAULT_NAME,
-                "serverID-1",
+                "1",
                 JobStatus.SUCCESS,
                 DEFAULT_QUEUE_TIME));
 
@@ -476,7 +476,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(DEFAULT_QUEUE_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-3",
+                "3",
                 "3",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -485,9 +485,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(firstJobBuild),
                 toRFC3339(DEFAULT_START_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-3",
+                "3",
                 DEFAULT_NAME,
-                "serverID-1",
+                "1",
                 JobStatus.SUCCESS,
                 DEFAULT_QUEUE_TIME));
 
@@ -525,7 +525,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(jobStart),  // Pipeline start should be earliest (job start)
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 "2",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -534,9 +534,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(jobBuild),
                 toRFC3339(jobStart),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 DEFAULT_NAME,
-                "serverID-1",
+                "1",
                 JobStatus.SUCCESS,
                 0));
 
@@ -575,7 +575,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(jobQueueTime),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 "2",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -584,9 +584,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(jobBuild),
                 toRFC3339(jobStartTime),  // Job webhook uses actual start time
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 DEFAULT_NAME,
-                "serverID-1",
+                "1",
                 JobStatus.SUCCESS,
                 3000));  // Queue time = jobStartTime(4000) - jobQueueTime(1000) = 3000ms
 
@@ -620,9 +620,9 @@ public class DatadogServerAdapterProcessingTest {
              defaultUrl(jobBuild),
              toRFC3339(DEFAULT_START_DATE),
              toRFC3339(DEFAULT_END_DATE),
-             "serverID-2",
+             "2",
              DEFAULT_NAME,
-             "serverID-1",
+             "1",
              JobStatus.ERROR,
              DEFAULT_QUEUE_TIME);
 
@@ -635,7 +635,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(pipelineBuild),
                 toRFC3339(DEFAULT_QUEUE_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 "2",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -671,7 +671,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(pipelineBuild),
             toRFC3339(DEFAULT_QUEUE_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-2",
+            "2",
             "2",
             NO_PARTIAL_RETRY,
             PipelineStatus.SUCCESS);
@@ -682,9 +682,9 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(jobBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-2",
+            "2",
             DEFAULT_NAME,
-            "serverID-1",
+            "1",
             JobStatus.SUCCESS,
             DEFAULT_QUEUE_TIME);
         expectedJobWebhook.setGitInfo(defaultGitInfo());
@@ -719,7 +719,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(pipelineBuild),
             toRFC3339(DEFAULT_QUEUE_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-2",
+            "2",
             "2",
             NO_PARTIAL_RETRY,
             PipelineStatus.SUCCESS);
@@ -730,9 +730,9 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(jobBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-2",
+            "2",
             DEFAULT_NAME,
-            "serverID-1",
+            "1",
             JobStatus.SUCCESS,
             DEFAULT_QUEUE_TIME);
         expectedJobWebhook.setGitInfo(defaultGitInfo());
@@ -760,7 +760,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(pipelineBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-1",
+            "1",
             "1",
             NO_PARTIAL_RETRY,
             PipelineStatus.SUCCESS);
@@ -794,7 +794,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(pipelineBuild),
             toRFC3339(DEFAULT_START_DATE),
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-2",
+            "2",
             "2",
             NO_PARTIAL_RETRY,
             PipelineStatus.CANCELED);
@@ -834,7 +834,7 @@ public class DatadogServerAdapterProcessingTest {
                         emptyUrl,
                         toRFC3339(DEFAULT_QUEUE_DATE),
                         toRFC3339(DEFAULT_END_DATE),
-                        "serverID-2",
+                        "2",
                         "2",
                         NO_PARTIAL_RETRY,
                         PipelineStatus.SUCCESS),
@@ -843,9 +843,9 @@ public class DatadogServerAdapterProcessingTest {
                         emptyUrl,
                         toRFC3339(DEFAULT_START_DATE),
                         toRFC3339(DEFAULT_END_DATE),
-                        "serverID-2",
+                        "2",
                         DEFAULT_NAME,
-                        "serverID-1",
+                        "1",
                         JobStatus.SUCCESS,
                         DEFAULT_QUEUE_TIME));
 
@@ -882,7 +882,7 @@ public class DatadogServerAdapterProcessingTest {
                         nonDefaultUrl(pipelineBuild),
                         toRFC3339(DEFAULT_QUEUE_DATE),
                         toRFC3339(DEFAULT_END_DATE),
-                        "serverID-2",
+                        "2",
                         "2",
                         NO_PARTIAL_RETRY,
                         PipelineStatus.SUCCESS),
@@ -891,9 +891,9 @@ public class DatadogServerAdapterProcessingTest {
                         nonDefaultUrl(jobBuild),
                         toRFC3339(DEFAULT_START_DATE),
                         toRFC3339(DEFAULT_END_DATE),
-                        "serverID-2",
+                        "2",
                         DEFAULT_NAME,
-                        "serverID-1",
+                        "1",
                         JobStatus.SUCCESS,
                         DEFAULT_QUEUE_TIME));
 
@@ -938,7 +938,7 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(nonCompositeBuild),
             toRFC3339(DEFAULT_QUEUE_DATE),  // Pipeline start uses job's queue time
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-1",
+            "1",
             "1",
             NO_PARTIAL_RETRY,
             PipelineStatus.SUCCESS);
@@ -948,9 +948,9 @@ public class DatadogServerAdapterProcessingTest {
             defaultUrl(nonCompositeBuild),
             toRFC3339(DEFAULT_START_DATE),  // Job start time
             toRFC3339(DEFAULT_END_DATE),
-            "serverID-1",
+            "1",
             DEFAULT_NAME,
-            "serverID-1",
+            "1",
             JobStatus.SUCCESS,
             DEFAULT_QUEUE_TIME);  // Queue time = start - queue = 3000 - 2000 = 1000ms
 
@@ -1001,7 +1001,7 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(nonCompositeBuild),
                 toRFC3339(DEFAULT_QUEUE_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 "2",
                 NO_PARTIAL_RETRY,
                 PipelineStatus.SUCCESS),
@@ -1010,9 +1010,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(dependencyBuild),
                 toRFC3339(DEFAULT_START_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 DEFAULT_NAME,
-                "serverID-1",
+                "1",
                 JobStatus.SUCCESS,
                 DEFAULT_QUEUE_TIME),
             new JobWebhook(
@@ -1020,9 +1020,9 @@ public class DatadogServerAdapterProcessingTest {
                 defaultUrl(nonCompositeBuild),
                 toRFC3339(DEFAULT_START_DATE),
                 toRFC3339(DEFAULT_END_DATE),
-                "serverID-2",
+                "2",
                 DEFAULT_NAME,
-                "serverID-2",
+                "2",
                 JobStatus.SUCCESS,
                 DEFAULT_QUEUE_TIME));
 
